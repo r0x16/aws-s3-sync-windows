@@ -2,7 +2,6 @@
 <#
 .SYNOPSIS
     Funciones para manejo del archivo de estado JSON
-    NOTA: Modificado para registrar información de la última copia realizada
 #>
 
 # Función: Inicializar o cargar archivo de estado JSON
@@ -46,14 +45,8 @@ function Get-State {
         else {
             $result = $jsonContent | ConvertFrom-Json
             
-            # Verificar si es la estructura antigua (array) y migrar
-            if ($result -is [System.Array]) {
-                Write-Log -Message "Detectada estructura de estado antigua. Migrando a nueva estructura..." -Level "WARNING"
-                return Migrate-LegacyState -LegacyState $result
-            }
-            
             # Verificar y completar estructura si faltan campos
-            return Ensure-StateStructure -State $result
+            return Confirm-StateStructure -State $result
         }
     }
     catch {
@@ -84,68 +77,10 @@ function Initialize-EmptyState {
     }
 }
 
-# Función: Migrar estado legacy (array) a nueva estructura
-function Migrate-LegacyState {
-    param (
-        [System.Array] $LegacyState
-    )
-    
-    $newState = Initialize-EmptyState
-    
-    if ($LegacyState.Count -gt 0) {
-        # Obtener última entrada global
-        $lastEntry = $LegacyState | Sort-Object Timestamp | Select-Object -Last 1
-        
-        # Migrar información básica
-        $newState.lastExecution.timestamp = $lastEntry.Timestamp
-        $newState.lastExecution.targetDate = $lastEntry.Date
-        
-        # Procesar configuraciones
-        $configGroups = $LegacyState | Group-Object ConfigName
-        foreach ($group in $configGroups) {
-            $configName = $group.Name
-            $lastConfigEntry = $group.Group | Sort-Object Timestamp | Select-Object -Last 1
-            
-            $newState.configurationResults | Add-Member -NotePropertyName $configName -NotePropertyValue ([PSCustomObject]@{
-                lastStatus = $lastConfigEntry.Status
-                lastMessage = $lastConfigEntry.Message
-                lastTimestamp = $lastConfigEntry.Timestamp
-                lastDate = $lastConfigEntry.Date
-                consecutiveFailures = 0
-                localPath = ""
-                s3Path = ""
-                filesTransferred = 0
-                duration = ""
-            })
-            
-            # Si fue exitosa, agregar a lastSuccessfulSync
-            if ($lastConfigEntry.Status -eq "Success") {
-                $newState.lastSuccessfulSync | Add-Member -NotePropertyName $configName -NotePropertyValue ([PSCustomObject]@{
-                    timestamp = $lastConfigEntry.Timestamp
-                    date = $lastConfigEntry.Date
-                    message = $lastConfigEntry.Message
-                    localPath = ""
-                    s3Path = ""
-                    filesTransferred = 0
-                    duration = ""
-                })
-            }
-        }
-        
-        # Estadísticas básicas
-        $newState.statistics.totalExecutions = $LegacyState.Count
-        $successEntries = $LegacyState | Where-Object { $_.Status -eq "Success" }
-        if ($successEntries.Count -gt 0) {
-            $newState.statistics.lastSuccessDate = ($successEntries | Sort-Object Timestamp | Select-Object -Last 1).Timestamp
-        }
-    }
-    
-    Write-Log -Message "Migración de estado completada. $(($LegacyState).Count) entradas legacy procesadas."
-    return $newState
-}
 
-# Función: Asegurar que la estructura del estado tenga todos los campos necesarios
-function Ensure-StateStructure {
+
+# Función: Confirmar que la estructura del estado tenga todos los campos necesarios
+function Confirm-StateStructure {
     param (
         [PSCustomObject] $State
     )
@@ -332,17 +267,6 @@ function Get-StateReport {
     return $report
 }
 
-# Función: Compatibilidad con código legacy - Agregar entrada al estado
-function Add-StateEntry {
-    param (
-        [string] $Date,
-        [string] $Status,
-        [string] $Message,
-        [string] $ConfigName = ""
-    )
-    
-    # Llamar a la nueva función con parámetros básicos
-    Set-ConfigurationResult -ConfigName $ConfigName -Status $Status -Message $Message -Date $Date
-}
+
 
 #endregion 
