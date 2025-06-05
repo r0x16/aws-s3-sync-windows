@@ -62,3 +62,6 @@ test-sync/
 # Variables de entorno locales
 .env
 .env.local 
+
+# Other files and folders
+.qodo/

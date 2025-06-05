@@ -182,11 +182,3 @@ aws configure
 ```powershell
 .\mochok.ps1 install
 ```
-
-## 🤝 Migration from Previous Version
-
-If you had the previous version with `sync-main.ps1`:
-
-1. Use `.\mochok.ps1 sync` instead of `.\sync-main.ps1`
-2. Other scripts are now commands: `status`, `strategies`, etc.
-3. All existing configurations remain the same 
