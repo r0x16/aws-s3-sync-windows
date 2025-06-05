@@ -1,0 +1,58 @@
+# Configuración de Sincronización AWS S3
+# Este archivo permite configurar múltiples tareas de sincronización
+# que se ejecutarán en secuencia
+
+# Configuración global
+global:
+  # Retención de logs en meses
+  log_retention_months: 12
+
+  # Carpeta base para logs (relativa al script)
+  log_directory: "log"
+
+  # Archivo de estado (relativo al script)
+  state_file: "state.json"
+
+# Configuraciones de sincronización
+# Se ejecutarán en el orden definido aquí
+sync_configurations:
+- name: "Documentos Corporativos"
+  description: "Sincronización de documentos diarios corporativos"
+  enabled: true
+  local_base_path: "C:\\Datos\\Documentos"
+  bucket_name: "corp-documentos-backup"
+  s3_path_structure: "{year}/{month}/{day}" # Opcional: personalizar estructura S3
+  date_folder_format: "yyyy-MM-dd" # Formato de carpetas de fecha
+  sync_options:
+  - "--exclude=*.tmp"
+  - "--exclude=*.log"
+
+- name: "Fotos Diarias"
+  description: "Backup de fotos tomadas cada día"
+  enabled: true
+  local_base_path: "D:\\Fotos\\Diarias"
+  bucket_name: "fotos-backup-s3"
+  s3_path_structure: "fotos/{year}/{month}/{day}"
+  date_folder_format: "yyyy-MM-dd"
+  sync_options:
+  - "--exclude=*.thumbs"
+
+- name: "Logs del Sistema"
+  description: "Backup de logs del sistema"
+  enabled: false # Deshabilitado
+  local_base_path: "C:\\Logs\\Sistema"
+  bucket_name: "sistema-logs-backup"
+  s3_path_structure: "logs/{year}/{month}/{day}"
+  date_folder_format: "yyyy-MM-dd"
+  sync_options:
+  - "--exclude=*.lock"
+  - "--include=*.log"
+
+- name: "Datos de Ventas"
+  description: "Sincronización de datos de ventas diarios"
+  enabled: true
+  local_base_path: "E:\\Ventas\\Diario"
+  bucket_name: "ventas-data-backup"
+  s3_path_structure: "ventas/{year}/{month}/{day}"
+  date_folder_format: "yyyy-MM-dd"
+  sync_options: [] # Sin opciones adicionales 
