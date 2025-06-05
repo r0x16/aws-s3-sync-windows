@@ -46,7 +46,7 @@ param(
 #region Ejecución Principal
 try {
     # Cargar configuración desde YAML
-    Import-YamlConfig
+    Import-YamlConfig -ScriptRoot $PSScriptRoot
     
     # Inicializar sistema de logging
     Initialize-Logging
@@ -67,10 +67,12 @@ try {
     
     if ($syncResults.Success) {
         Write-Log -Message "=== Proceso de sincronización completado exitosamente. Total: $($syncResults.TotalConfigs), Exitosas: $($syncResults.SuccessCount) ==="
+        Complete-Logging
         exit 0
     }
     else {
         Write-Log -Message "=== Proceso de sincronización completado con errores. Total: $($syncResults.TotalConfigs), Exitosas: $($syncResults.SuccessCount), Errores: $($syncResults.ErrorCount) ==="
+        Complete-Logging
         exit 1
     }
 }
@@ -78,6 +80,7 @@ catch {
     $errorMsg = "Error inesperado durante la ejecución: $_"
     Write-Log -Message $errorMsg -Level "ERROR"
     Write-Error $errorMsg
+    Complete-Logging
     exit 1
 }
 #endregion 

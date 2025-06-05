@@ -13,14 +13,15 @@ Write-Host "=== Instalando prerrequisitos para AWS S3 Sync ===" -ForegroundColor
 
 # Verificar y ajustar política de ejecución
 $currentPolicy = Get-ExecutionPolicy -Scope CurrentUser
-if ($currentPolicy -eq "Restricted") {
-    Write-Host "Ajustando política de ejecución..." -ForegroundColor Yellow
+if ($currentPolicy -ne "RemoteSigned") {
+    Write-Host "Ajustando política de ejecución desde '$currentPolicy' a 'RemoteSigned'..." -ForegroundColor Yellow
     try {
         Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-        Write-Host "✓ Política de ejecución configurada correctamente" -ForegroundColor Green
+        Write-Host "✓ Política de ejecución configurada correctamente a RemoteSigned" -ForegroundColor Green
     }
     catch {
         Write-Error "Error al configurar política de ejecución: $_"
+        Write-Host "Ejecute PowerShell como administrador y vuelva a intentar" -ForegroundColor Yellow
         exit 1
     }
 }
@@ -73,12 +74,52 @@ else {
 }
 
 # Verificar archivo de configuración
-$configFile = Join-Path $PSScriptRoot "sync-config.yaml"
+$projectRoot = Split-Path $PSScriptRoot -Parent
+$configFile = Join-Path $projectRoot "sync-config.yaml"
+
 if (Test-Path $configFile) {
     Write-Host "✓ Archivo de configuración encontrado: sync-config.yaml" -ForegroundColor Green
 }
 else {
-    Write-Host "⚠ Archivo de configuración no encontrado. Se creará con valores de ejemplo." -ForegroundColor Yellow
+    Write-Host "⚠ Archivo de configuración no encontrado. Creando archivo de ejemplo..." -ForegroundColor Yellow
+    
+    # Crear archivo de configuración básico
+    $basicConfig = @"
+# Configuración de Sincronización AWS S3
+# Este archivo permite configurar múltiples tareas de sincronización
+
+# Configuración global
+global:
+  # Retención de logs en meses
+  log_retention_months: 12
+  # Carpeta base para logs (relativa al script)
+  log_directory: "log"
+  # Archivo de estado (relativo al script)
+  state_file: "state.json"
+
+# Configuraciones de sincronización
+sync_configurations:
+- name: "Documentos Ejemplo"
+  description: "Configuración de ejemplo para sincronización"
+  enabled: false # Cambiar a true para habilitar
+  local_base_path: "C:\\Ruta\\Local\\Ejemplo"
+  bucket_name: "mi-bucket-ejemplo"
+  aws_profile: "default"
+  s3_path_structure: "{year}/{month}/{day}"
+  date_folder_format: "yyyy-MM-dd"
+  sync_options:
+  - "--exclude=*.tmp"
+  - "--exclude=*.log"
+"@
+    
+    try {
+        $basicConfig | Out-File -FilePath $configFile -Encoding UTF8
+        Write-Host "✓ Archivo de configuración creado: sync-config.yaml" -ForegroundColor Green
+        Write-Host "  Edite el archivo para configurar sus rutas y buckets específicos" -ForegroundColor Yellow
+    }
+    catch {
+        Write-Error "Error al crear archivo de configuración: $_"
+    }
 }
 
 Write-Host "`n=== Instalación de prerrequisitos completada ===" -ForegroundColor Green
