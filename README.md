@@ -96,8 +96,57 @@ Para ejecutar automáticamente cada día:
 ## 📋 Logs y Estado
 
 - **Logs**: `log/sync_YYYY-MM.log` (un archivo por mes)
-- **Estado**: `state.json` (historial de ejecuciones)
+- **Estado**: `state.json` (información de la última copia realizada)
 - **Rotación**: Los logs se limpian automáticamente
+
+### 📊 Nuevo Sistema de Estado
+
+El archivo `state.json` ahora registra información **detallada de la última copia realizada**:
+
+```json
+{
+  "lastExecution": {
+    "timestamp": "2025-01-20T10:00:00Z",
+    "success": true,
+    "totalConfigurations": 3,
+    "successfulConfigurations": 2,
+    "failedConfigurations": 1,
+    "targetDate": "2025-01-19",
+    "duration": "00:05:23"
+  },
+  "configurationResults": {
+    "Documentos": {
+      "lastStatus": "Success",
+      "lastMessage": "Sincronización completada. Archivos transferidos: 15",
+      "lastTimestamp": "2025-01-20T10:02:15Z",
+      "localPath": "C:\\Datos\\2025-01-19",
+      "s3Path": "s3://mi-bucket/2025/01/19",
+      "filesTransferred": 15,
+      "duration": "00:02:30"
+    }
+  },
+  "lastSuccessfulSync": {
+    "Documentos": {
+      "timestamp": "2025-01-20T10:02:15Z",
+      "date": "2025-01-19",
+      "filesTransferred": 15
+    }
+  }
+}
+```
+
+### 📈 Comando de Estado
+
+```powershell
+# Ver reporte completo del estado
+.\show-status.ps1
+
+# Ver solo última ejecución
+.\show-status.ps1 -OnlyLastExecution
+
+# Salida en formato JSON
+.\show-status.ps1 -JsonOutput
+```
 
 ## ❓ Problemas Comunes
 
