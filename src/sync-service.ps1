@@ -57,9 +57,9 @@ function Start-AllSyncProcesses {
     )
     
     $configurations = Get-EnabledSyncConfigurations
-    $totalConfigs = $configurations.Count
-    $successCount = 0
-    $errorCount = 0
+    $totalConfigs = [int]$configurations.Count
+    $successCount = [int]0
+    $errorCount = [int]0
     
     Write-Log -Message "=== Iniciando sincronización para $totalConfigs configuración(es) ==="
     
@@ -69,16 +69,16 @@ function Start-AllSyncProcesses {
             $success = Start-SyncProcess -TargetDate $TargetDate -SyncConfig $config
             
             if ($success) {
-                $successCount++
+                $successCount = $successCount + 1
                 Write-Log -Message "[$($config.name)] Configuración procesada exitosamente." -Level "INFO"
             }
             else {
-                $errorCount++
+                $errorCount = $errorCount + 1
                 Write-Log -Message "[$($config.name)] Error al procesar configuración." -Level "ERROR"
             }
         }
         catch {
-            $errorCount++
+            $errorCount = $errorCount + 1
             $errorMsg = "[$($config.name)] Excepción inesperada: $_"
             Write-Log -Message $errorMsg -Level "ERROR"
         }

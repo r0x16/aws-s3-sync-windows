@@ -91,7 +91,7 @@ function Invoke-S3Sync {
             $syncCommand += " $optionsString"
         }
         
-        Write-Verbose "Ejecutando comando: $syncCommand"
+        Write-Log -Message "Ejecutando comando AWS S3: $syncCommand"
         $output = Invoke-Expression -Command $syncCommand 2>&1
         $success = $?
 
@@ -110,5 +110,78 @@ function Invoke-S3Sync {
             Command = $syncCommand
         }
     }
+}
+
+# Función: Eliminar carpeta de forma forzada cuando hay handles abiertos
+function Remove-FolderForced {
+    param (
+        [string] $Path
+    )
+    
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Write-Host "La carpeta '$Path' no existe." -ForegroundColor Yellow
+        return $true
+    }
+    
+    try {
+        # Método 1: Intentar eliminación normal
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+        Write-Host "Carpeta '$Path' eliminada exitosamente." -ForegroundColor Green
+        return $true
+    }
+    catch {
+        Write-Host "Eliminación normal falló: $_" -ForegroundColor Yellow
+    }
+    
+    try {
+        # Método 2: Cambiar directorio y forzar garbage collection
+        $originalLocation = Get-Location
+        Set-Location -Path $env:TEMP
+        
+        # Múltiples ciclos de garbage collection
+        for ($i = 0; $i -lt 5; $i++) {
+            [System.GC]::Collect()
+            [System.GC]::WaitForPendingFinalizers()
+            [System.GC]::Collect()
+            Start-Sleep -Milliseconds 200
+        }
+        
+        # Intentar eliminación nuevamente
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+        Set-Location -Path $originalLocation
+        Write-Host "Carpeta '$Path' eliminada exitosamente después de limpiar handles." -ForegroundColor Green
+        return $true
+    }
+    catch {
+        Write-Host "Eliminación con limpieza falló: $_" -ForegroundColor Yellow
+        try { Set-Location -Path $originalLocation } catch {}
+    }
+    
+    try {
+        # Método 3: Usar robocopy para "mover" a una carpeta temporal vacía (truco para liberar handles)
+        $tempEmptyDir = Join-Path $env:TEMP "empty_$(Get-Random)"
+        New-Item -ItemType Directory -Path $tempEmptyDir -Force | Out-Null
+        
+        # Usar robocopy para sincronizar con carpeta vacía (efectivamente vacía la carpeta original)
+        & robocopy $tempEmptyDir $Path /MIR /NJH /NJS /NP | Out-Null
+        Start-Sleep -Seconds 1
+        
+        # Ahora intentar eliminar
+        Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+        Remove-Item -LiteralPath $tempEmptyDir -Force -ErrorAction SilentlyContinue
+        
+        Write-Host "Carpeta '$Path' eliminada exitosamente usando robocopy." -ForegroundColor Green
+        return $true
+    }
+    catch {
+        Write-Host "Eliminación con robocopy falló: $_" -ForegroundColor Yellow
+    }
+    
+    # Si todo falla, mostrar mensaje de ayuda
+    Write-Host "No se pudo eliminar la carpeta '$Path'. Posibles soluciones:" -ForegroundColor Red
+    Write-Host "1. Cerrar todos los exploradores de archivos" -ForegroundColor Red
+    Write-Host "2. Cerrar este terminal de PowerShell y abrir uno nuevo" -ForegroundColor Red
+    Write-Host "3. Reiniciar el sistema" -ForegroundColor Red
+    return $false
 }
 #endregion 
