@@ -6,19 +6,19 @@
 
 # Función: Inicializar o cargar archivo de estado JSON
 function Get-State {
-    if (-not (Test-Path -LiteralPath $Global:StateFile)) {
+    if (-not (Test-Path -LiteralPath $(Get-StateFile))) {
         # Crear archivo con arreglo vacío
         try {
-            @() | ConvertTo-Json | Out-File -LiteralPath $Global:StateFile -Encoding UTF8 -Force
+            @() | ConvertTo-Json | Out-File -LiteralPath $(Get-StateFile) -Encoding UTF8 -Force
         }
         catch {
-            Write-Error "No se pudo crear el archivo de estado '$($Global:StateFile)': $_"
+            Write-Error "No se pudo crear el archivo de estado '$(Get-StateFile)': $_"
             exit 1
         }
     }
     # Leer JSON existente
     try {
-        $jsonContent = Get-Content -LiteralPath $Global:StateFile -Raw -ErrorAction Stop
+        $jsonContent = Get-Content -LiteralPath $(Get-StateFile) -Raw -ErrorAction Stop
         if ([string]::IsNullOrWhiteSpace($jsonContent)) {
             return @()
         }
@@ -27,7 +27,7 @@ function Get-State {
         }
     }
     catch {
-        Write-Error "No se pudo leer o parsear el archivo de estado '$($Global:StateFile)': $_"
+        Write-Error "No se pudo leer o parsear el archivo de estado '$(Get-StateFile)': $_"
         exit 1
     }
 }
@@ -39,10 +39,10 @@ function Set-State {
         [object[]] $StateArray
     )
     try {
-        $StateArray | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $Global:StateFile -Encoding UTF8 -Force
+        $StateArray | ConvertTo-Json -Depth 5 | Out-File -LiteralPath $(Get-StateFile) -Encoding UTF8 -Force
     }
     catch {
-        Write-Error "No se pudo escribir el archivo de estado '$($Global:StateFile)': $_"
+        Write-Error "No se pudo escribir el archivo de estado '$(Get-StateFile)': $_"
     }
 }
 

@@ -13,7 +13,7 @@ function Write-Log {
     )
     # Nombre del archivo de log: sync_YYYY-MM.log (correspondiente al mes actual)
     $logFileName = "sync_$((Get-Date).ToString('yyyy-MM')).log"
-    $logPath = Join-Path $Global:LogDir $logFileName
+    $logPath = Join-Path $(Get-LogDirectory) $logFileName
 
     $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     $entry = "[$timestamp] [$Level] $Message"
@@ -28,13 +28,13 @@ function Write-Log {
 # Función: Rotar logs (eliminar archivos con más de X meses de antigüedad)
 function Remove-OldLogs {
     # Fecha límite: hace X meses según configuración
-    $limitDate = (Get-Date).AddMonths(-$Global:LogRetentionMonths)
+    $limitDate = (Get-Date).AddMonths(-$(Get-LogRetentionMonths))
     
-    if (-not (Test-Path -LiteralPath $Global:LogDir)) {
+    if (-not (Test-Path -LiteralPath $(Get-LogDirectory))) {
         return
     }
     
-    Get-ChildItem -LiteralPath $Global:LogDir -Filter "sync_*.log" -File | ForEach-Object {
+    Get-ChildItem -LiteralPath $(Get-LogDirectory) -Filter "sync_*.log" -File | ForEach-Object {
         # Nombre de archivo: sync_YYYY-MM.log
         if ($_.Name -match '^sync_(\d{4})-(\d{2})\.log$') {
             $year = [int]$Matches[1]
@@ -61,7 +61,7 @@ function Remove-OldLogs {
 
 # Función: Inicializar sistema de logging
 function Initialize-Logging {
-    Test-AndCreateFolder -Path $Global:LogDir
+    Test-AndCreateFolder -Path $(Get-LogDirectory)
     Remove-OldLogs
 }
 #endregion 
