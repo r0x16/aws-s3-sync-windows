@@ -40,21 +40,76 @@ sync_configurations:
     description: "Backup diario de documentos"
     enabled: true
     local_base_path: "C:\\MisCarpetas"
-    bucket_name: "mi-bucket-s3"
-    aws_profile: "default"  # Profile de AWS a usar
-    s3_path_structure: "{year}/{month}/{day}"
-    date_folder_format: "yyyy-MM-dd"
+    
+    # Estrategia de sincronización
+    sync_strategy:
+      type: "DateFolder"
+      date_folder_format: "yyyy-MM-dd"
+    
+    # Configuración del destino AWS S3
+    destination_config:
+      bucket_name: "mi-bucket-s3"
+      aws_profile: "default"  # Profile de AWS a usar
+      s3_path_structure: "{year}/{month}/{day}"
+    
     sync_options:
       - "--exclude=*.tmp"
 ```
 
+### 🎯 Estrategias de Sincronización
+
+**¡Nueva funcionalidad!** El sistema ahora soporta múltiples estrategias de sincronización organizadas profesionalmente:
+
+#### 1. **DateFolder** (Predeterminada)
+Sincroniza carpeta específica del día anterior:
+```yaml
+sync_strategy:
+  type: "DateFolder"
+  date_folder_format: "yyyy-MM-dd"  # Formato de carpetas
+```
+
+#### 2. **FullDirectory**
+Sincroniza toda la carpeta base completa:
+```yaml
+sync_strategy:
+  type: "FullDirectory"
+# Sincroniza todo el contenido de local_base_path
+```
+
+#### 3. **DateRange**
+Sincroniza archivos de un rango de fechas:
+```yaml
+sync_strategy:
+  type: "DateRange"
+  date_range_days_back: 7  # Últimos 7 días
+```
+
+#### 4. **CustomPattern**
+Sincroniza usando patrón personalizado:
+```yaml
+sync_strategy:
+  type: "CustomPattern"
+  custom_local_pattern: "{base_path}\\{year}\\{month}"
+```
+
+**Ver todas las estrategias disponibles**:
+```powershell
+.\show-sync-strategies.ps1
+.\show-sync-strategies.ps1 -ShowExamples
+```
+
 ### Parámetros principales:
-- **`local_base_path`**: Carpeta donde están tus carpetas diarias (ej: `C:\Documentos`)
-- **`bucket_name`**: Nombre del bucket S3 (sin `s3://`) - **Se crea automáticamente si no existe**
-- **`aws_profile`**: Profile de AWS a usar (`"default"` o nombre específico)
-- **`aws_region`**: Región AWS donde crear el bucket (opcional, se detecta automáticamente)
-- **`s3_path_structure`**: Cómo organizar en S3. Usa `{year}`, `{month}`, `{day}`
-- **`date_folder_format`**: Formato de tus carpetas de fecha local
+- **`local_base_path`**: Carpeta base para sincronización
+- **`sync_strategy`**: Configuración de la estrategia de sincronización
+  - **`type`**: Tipo de estrategia (`DateFolder`, `FullDirectory`, `DateRange`, `CustomPattern`)
+  - **`date_folder_format`**: Formato de carpetas de fecha (solo estrategia DateFolder)
+  - **`custom_local_pattern`**: Patrón personalizado (solo estrategia CustomPattern)
+  - **`date_range_days_back`**: Días hacia atrás (solo estrategia DateRange)
+- **`destination_config`**: Configuración del destino AWS S3
+  - **`bucket_name`**: Nombre del bucket S3 (sin `s3://`) - **Se crea automáticamente si no existe**
+  - **`aws_profile`**: Profile de AWS a usar (`"default"` o nombre específico)
+  - **`aws_region`**: Región AWS donde crear el bucket (opcional, se detecta automáticamente)
+  - **`s3_path_structure`**: Cómo organizar en S3. Usa `{year}`, `{month}`, `{day}`
 - **`sync_options`**: Opciones adicionales de AWS CLI (excluir archivos, etc.)
 
 ## 🔄 Uso
@@ -83,15 +138,18 @@ sync_configurations:
 ```yaml
 sync_configurations:
   - name: "Mi Backup"
-    bucket_name: "mi-nuevo-bucket"
-    aws_profile: "mi-profile"
-    aws_region: "us-west-2"  # Opcional: especifica la región
+    destination_config:
+      bucket_name: "mi-nuevo-bucket"
+      aws_profile: "mi-profile"
+      aws_region: "us-west-2"  # Opcional: especifica la región
     # ... otros parámetros
 ```
 
 Si no se especifica `aws_region`, el sistema:
 1. Intentará detectar la región del profile AWS configurado
 2. Usará `us-east-1` como región por defecto
+
+**💡 Para ver ejemplos completos de configuración**, consulta: `sync-config.yaml.example`
 
 ## ⏰ Programación Automática
 
@@ -107,17 +165,22 @@ Para ejecutar automáticamente cada día:
 ## 📁 Estructura de Archivos
 
 ```
-├── sync-main.ps1          # Script principal
-├── sync-config.yaml       # Tu configuración
-├── sync-config.yaml.example # Ejemplos de configuración
-├── src/                   # Código del sistema
-│   ├── config.ps1         #   Manejo de configuración
-│   ├── utils.ps1          #   Utilidades y AWS S3
-│   ├── logging.ps1        #   Sistema de logging
-│   ├── state-manager.ps1  #   Manejo de estado
-│   └── sync-service.ps1   #   Servicios de sincronización
-├── log/                   # Logs automáticos
-└── state.json             # Estado de sincronizaciones
+├── sync-main.ps1                         # Script principal
+├── show-sync-strategies.ps1              # Mostrar estrategias disponibles
+├── show-status.ps1                       # Ver estado y estadísticas
+├── clean-logs.ps1                        # Limpieza de logs antiguos
+├── sync-config.yaml                      # Tu configuración
+├── sync-config.yaml.example              # Guía completa y ejemplos de todas las estrategias
+├── src/                                  # Código del sistema
+│   ├── config.ps1                        #   Manejo de configuración
+│   ├── utils.ps1                         #   Utilidades y estrategias de sync
+│   ├── logging.ps1                       #   Sistema de logging
+│   ├── state-manager.ps1                 #   Manejo de estado
+│   ├── sync-service.ps1                  #   Servicios de sincronización
+│   ├── log-cleaner.ps1                   #   Limpieza de logs
+│   └── install-requirements.ps1          #   Instalación de prerrequisitos
+├── log/                                  # Logs automáticos
+└── state.json                            # Estado de sincronizaciones
 ```
 
 ## 📋 Logs y Estado

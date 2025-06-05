@@ -39,14 +39,33 @@ function Start-SyncProcess {
     }
     
     # Verificar/crear bucket S3 si es necesario
-    $awsProfile = if ($SyncConfig.aws_profile) { $SyncConfig.aws_profile } else { "default" }
-    $bucketRegion = if ($SyncConfig.aws_region) { $SyncConfig.aws_region } else { $null }
+    $awsProfile = if ($SyncConfig.destination_config -and $SyncConfig.destination_config.aws_profile) { 
+        $SyncConfig.destination_config.aws_profile 
+    } elseif ($SyncConfig.aws_profile) { 
+        $SyncConfig.aws_profile 
+    } else { 
+        "default" 
+    }
     
-    Write-Log -Message "[$($SyncConfig.name)] Verificando bucket S3: $($SyncConfig.bucket_name)"
-    $bucketResult = Confirm-S3Bucket -BucketName $SyncConfig.bucket_name -AwsProfile $awsProfile -Region $bucketRegion
+    $bucketRegion = if ($SyncConfig.destination_config -and $SyncConfig.destination_config.aws_region) { 
+        $SyncConfig.destination_config.aws_region 
+    } elseif ($SyncConfig.aws_region) { 
+        $SyncConfig.aws_region 
+    } else { 
+        $null 
+    }
+    
+    $bucketName = if ($SyncConfig.destination_config -and $SyncConfig.destination_config.bucket_name) { 
+        $SyncConfig.destination_config.bucket_name 
+    } else { 
+        $SyncConfig.bucket_name 
+    }
+    
+    Write-Log -Message "[$($SyncConfig.name)] Verificando bucket S3: $bucketName"
+    $bucketResult = Confirm-S3Bucket -BucketName $bucketName -AwsProfile $awsProfile -Region $bucketRegion
     
     if (-not $bucketResult.Success) {
-        $msg = "[$($SyncConfig.name)] Error al verificar/crear bucket S3 '$($SyncConfig.bucket_name)': $($bucketResult.Message)"
+        $msg = "[$($SyncConfig.name)] Error al verificar/crear bucket S3 '$bucketName': $($bucketResult.Message)"
         Write-Log -Message $msg -Level "ERROR"
         
         # Registrar resultado con información detallada
@@ -56,9 +75,9 @@ function Start-SyncProcess {
     
     # Registrar el resultado del bucket
     if ($bucketResult.Action -eq "Created") {
-        Write-Log -Message "[$($SyncConfig.name)] Bucket S3 '$($SyncConfig.bucket_name)' creado exitosamente en la región '$($bucketResult.Region)'"
+        Write-Log -Message "[$($SyncConfig.name)] Bucket S3 '$bucketName' creado exitosamente en la región '$($bucketResult.Region)'"
     } elseif ($bucketResult.Action -eq "Exists") {
-        Write-Log -Message "[$($SyncConfig.name)] Bucket S3 '$($SyncConfig.bucket_name)' ya existía"
+        Write-Log -Message "[$($SyncConfig.name)] Bucket S3 '$bucketName' ya existía"
     }
     
     # Contar archivos antes de la sincronización
@@ -182,10 +201,60 @@ function Test-SystemPrerequisites {
         $issues += "No hay configuraciones de sincronización habilitadas"
     }
     
-    # Verificar carpetas base de cada configuración
+    # Verificar configuración de cada estrategia de sincronización
     foreach ($config in $configurations) {
-        if (-not (Test-Path -LiteralPath $config.local_base_path)) {
-            $issues += "[$($config.name)] Carpeta base '$($config.local_base_path)' no existe"
+        # Validar configuración de la estrategia de sincronización
+        $strategyValidation = Test-SyncStrategyConfiguration -SyncConfig $config
+        if (-not $strategyValidation.IsValid) {
+            foreach ($issue in $strategyValidation.Issues) {
+                $issues += "[$($config.name)] $issue"
+            }
+        }
+        
+        # Verificar carpetas base según la estrategia
+        $strategyType = if ($config.sync_strategy -and $config.sync_strategy.type) { 
+            $config.sync_strategy.type 
+        } elseif ($config.sync_mode) { 
+            $config.sync_mode 
+        } else { 
+            "DateFolder" 
+        }
+        
+        switch ($strategyType) {
+            "DateFolder" {
+                if (-not (Test-Path -LiteralPath $config.local_base_path)) {
+                    $issues += "[$($config.name)] Carpeta base '$($config.local_base_path)' no existe"
+                }
+            }
+            "FullDirectory" {
+                if (-not (Test-Path -LiteralPath $config.local_base_path)) {
+                    $issues += "[$($config.name)] Carpeta base '$($config.local_base_path)' no existe"
+                }
+            }
+            "DateRange" {
+                if (-not (Test-Path -LiteralPath $config.local_base_path)) {
+                    $issues += "[$($config.name)] Carpeta base '$($config.local_base_path)' no existe"
+                }
+            }
+            "CustomPattern" {
+                # Para CustomPattern verificamos si es un patrón que incluye carpeta base
+                $hasCustomPattern = ($config.sync_strategy -and $config.sync_strategy.custom_local_pattern) -or 
+                                  ($config.mode_config -and $config.mode_config.custom_local_pattern)
+                
+                if ($hasCustomPattern) {
+                    $customPattern = if ($config.sync_strategy -and $config.sync_strategy.custom_local_pattern) { 
+                        $config.sync_strategy.custom_local_pattern 
+                    } else { 
+                        $config.mode_config.custom_local_pattern 
+                    }
+                    
+                    if ($customPattern.Contains("{base_path}") -and -not (Test-Path -LiteralPath $config.local_base_path)) {
+                        $issues += "[$($config.name)] Carpeta base '$($config.local_base_path)' no existe (requerida por sync_strategy.custom_local_pattern)"
+                    }
+                } elseif ($config.local_base_path -and -not (Test-Path -LiteralPath $config.local_base_path)) {
+                    $issues += "[$($config.name)] Carpeta base '$($config.local_base_path)' no existe"
+                }
+            }
         }
     }
     

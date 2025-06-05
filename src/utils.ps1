@@ -32,18 +32,67 @@ function Get-SyncPaths {
         [PSCustomObject] $SyncConfig
     )
     
+    # Obtener la estrategia de sincronización (por defecto: DateFolder)
+    $strategyType = if ($SyncConfig.sync_strategy -and $SyncConfig.sync_strategy.type) { 
+        $SyncConfig.sync_strategy.type 
+    } elseif ($SyncConfig.sync_mode) { 
+        # Compatibilidad hacia atrás
+        $SyncConfig.sync_mode 
+    } else { 
+        "DateFolder" 
+    }
+    
+    Write-Log -Message "[$($SyncConfig.name)] Estrategia de sincronización: $strategyType"
+    
+    switch ($strategyType) {
+        "DateFolder" {
+            return Get-DateFolderSyncPaths -Date $Date -SyncConfig $SyncConfig
+        }
+        "FullDirectory" {
+            return Get-FullDirectorySyncPaths -Date $Date -SyncConfig $SyncConfig
+        }
+        "DateRange" {
+            return Get-DateRangeSyncPaths -Date $Date -SyncConfig $SyncConfig
+        }
+        "CustomPattern" {
+            return Get-CustomPatternSyncPaths -Date $Date -SyncConfig $SyncConfig
+        }
+        default {
+            Write-Log -Message "[$($SyncConfig.name)] Estrategia de sincronización no reconocida '$strategyType', usando 'DateFolder' por defecto" -Level "WARNING"
+            return Get-DateFolderSyncPaths -Date $Date -SyncConfig $SyncConfig
+        }
+    }
+}
+
+# Función: Estrategia DateFolder - Sincronizar carpeta específica del día (estrategia original)
+function Get-DateFolderSyncPaths {
+    param (
+        [datetime] $Date,
+        [PSCustomObject] $SyncConfig
+    )
+    
     $year = $Date.ToString("yyyy")
     $month = $Date.ToString("MM")
     
     # Usar el formato de fecha especificado en la configuración
-    $dateFormat = if ($SyncConfig.date_folder_format) { $SyncConfig.date_folder_format } else { "yyyy-MM-dd" }
+    $dateFormat = if ($SyncConfig.sync_strategy -and $SyncConfig.sync_strategy.date_folder_format) { 
+        $SyncConfig.sync_strategy.date_folder_format 
+    } elseif ($SyncConfig.mode_config -and $SyncConfig.mode_config.date_folder_format) { 
+        # Compatibilidad hacia atrás
+        $SyncConfig.mode_config.date_folder_format 
+    } else { 
+        "yyyy-MM-dd" 
+    }
     $dayFolderName = $Date.ToString($dateFormat)
     
     # Construir ruta local
     $localFolderPath = Join-Path $SyncConfig.local_base_path $dayFolderName
     
     # Construir estructura S3 personalizada
-    $s3Structure = if ($SyncConfig.s3_path_structure) { 
+    $s3Structure = if ($SyncConfig.destination_config -and $SyncConfig.destination_config.s3_path_structure) { 
+        $SyncConfig.destination_config.s3_path_structure 
+    } elseif ($SyncConfig.s3_path_structure) { 
+        # Compatibilidad hacia atrás
         $SyncConfig.s3_path_structure 
     } else { 
         "{year}/{month}/{day}" 
@@ -54,13 +103,261 @@ function Get-SyncPaths {
     $s3Structure = $s3Structure -replace '\{month\}', $month
     $s3Structure = $s3Structure -replace '\{day\}', $dayFolderName
     
-    $s3Destination = "s3://$($SyncConfig.bucket_name)/$s3Structure"
+    # Obtener bucket name
+    $bucketName = if ($SyncConfig.destination_config -and $SyncConfig.destination_config.bucket_name) { 
+        $SyncConfig.destination_config.bucket_name 
+    } else { 
+        $SyncConfig.bucket_name 
+    }
+    
+    $s3Destination = "s3://$bucketName/$s3Structure"
     
     return @{
         LocalPath = $localFolderPath
         S3Path = $s3Destination
         DayFolder = $dayFolderName
         ConfigName = $SyncConfig.name
+        StrategyType = "DateFolder"
+    }
+}
+
+# Función: Estrategia FullDirectory - Sincronizar toda la carpeta base
+function Get-FullDirectorySyncPaths {
+    param (
+        [datetime] $Date,
+        [PSCustomObject] $SyncConfig
+    )
+    
+    $year = $Date.ToString("yyyy")
+    $month = $Date.ToString("MM")
+    $day = $Date.ToString("dd")
+    
+    # Ruta local es la carpeta base completa
+    $localFolderPath = $SyncConfig.local_base_path
+    
+    # Construir estructura S3 (usando la fecha para organización)
+    $s3Structure = if ($SyncConfig.destination_config -and $SyncConfig.destination_config.s3_path_structure) { 
+        $SyncConfig.destination_config.s3_path_structure 
+    } elseif ($SyncConfig.s3_path_structure) { 
+        # Compatibilidad hacia atrás
+        $SyncConfig.s3_path_structure 
+    } else { 
+        "full-backup/{year}/{month}"
+    }
+    
+    # Reemplazar placeholders en la estructura S3
+    $s3Structure = $s3Structure -replace '\{year\}', $year
+    $s3Structure = $s3Structure -replace '\{month\}', $month
+    $s3Structure = $s3Structure -replace '\{day\}', $day
+    
+    # Obtener bucket name
+    $bucketName = if ($SyncConfig.destination_config -and $SyncConfig.destination_config.bucket_name) { 
+        $SyncConfig.destination_config.bucket_name 
+    } else { 
+        $SyncConfig.bucket_name 
+    }
+    
+    $s3Destination = "s3://$bucketName/$s3Structure"
+    
+    return @{
+        LocalPath = $localFolderPath
+        S3Path = $s3Destination
+        DayFolder = "full-directory"
+        ConfigName = $SyncConfig.name
+        StrategyType = "FullDirectory"
+    }
+}
+
+# Función: Estrategia DateRange - Sincronizar un rango de fechas
+function Get-DateRangeSyncPaths {
+    param (
+        [datetime] $Date,
+        [PSCustomObject] $SyncConfig
+    )
+    
+    # Obtener configuración del rango de fechas
+    $daysBack = if ($SyncConfig.sync_strategy -and $SyncConfig.sync_strategy.date_range_days_back) { 
+        $SyncConfig.sync_strategy.date_range_days_back 
+    } elseif ($SyncConfig.mode_config -and $SyncConfig.mode_config.date_range_days_back) { 
+        # Compatibilidad hacia atrás
+        $SyncConfig.mode_config.date_range_days_back 
+    } else { 
+        7 
+    }
+    $startDate = $Date.AddDays(-$daysBack)
+    
+    $year = $Date.ToString("yyyy")
+    $month = $Date.ToString("MM")
+    $day = $Date.ToString("dd")
+    
+    Write-Log -Message "[$($SyncConfig.name)] Rango de fechas: desde $($startDate.ToString('yyyy-MM-dd')) hasta $($Date.ToString('yyyy-MM-dd'))"
+    
+    # Para DateRange, sincronizamos la carpeta base pero con filtros específicos
+    $localFolderPath = $SyncConfig.local_base_path
+    
+    # Construir estructura S3
+    $s3Structure = if ($SyncConfig.destination_config -and $SyncConfig.destination_config.s3_path_structure) { 
+        $SyncConfig.destination_config.s3_path_structure 
+    } elseif ($SyncConfig.s3_path_structure) { 
+        # Compatibilidad hacia atrás
+        $SyncConfig.s3_path_structure 
+    } else { 
+        "date-range/{year}/{month}"
+    }
+    
+    # Reemplazar placeholders en la estructura S3
+    $s3Structure = $s3Structure -replace '\{year\}', $year
+    $s3Structure = $s3Structure -replace '\{month\}', $month
+    $s3Structure = $s3Structure -replace '\{day\}', $day
+    
+    # Obtener bucket name
+    $bucketName = if ($SyncConfig.destination_config -and $SyncConfig.destination_config.bucket_name) { 
+        $SyncConfig.destination_config.bucket_name 
+    } else { 
+        $SyncConfig.bucket_name 
+    }
+    
+    $s3Destination = "s3://$bucketName/$s3Structure"
+    
+    return @{
+        LocalPath = $localFolderPath
+        S3Path = $s3Destination
+        DayFolder = "date-range-$($daysBack)days"
+        ConfigName = $SyncConfig.name
+        StrategyType = "DateRange"
+        StartDate = $startDate
+        EndDate = $Date
+        DaysBack = $daysBack
+    }
+}
+
+# Función: Estrategia CustomPattern - Sincronizar basado en un patrón personalizado
+function Get-CustomPatternSyncPaths {
+    param (
+        [datetime] $Date,
+        [PSCustomObject] $SyncConfig
+    )
+    
+    $year = $Date.ToString("yyyy")
+    $month = $Date.ToString("MM")
+    $day = $Date.ToString("dd")
+    
+    # Obtener patrón personalizado de carpeta local
+    $customPattern = if ($SyncConfig.sync_strategy -and $SyncConfig.sync_strategy.custom_local_pattern) { 
+        $SyncConfig.sync_strategy.custom_local_pattern 
+    } elseif ($SyncConfig.mode_config -and $SyncConfig.mode_config.custom_local_pattern) { 
+        # Compatibilidad hacia atrás
+        $SyncConfig.mode_config.custom_local_pattern 
+    } else { 
+        "{base_path}" 
+    }
+    
+    # Reemplazar placeholders en el patrón local
+    $localPattern = $customPattern -replace '\{base_path\}', $SyncConfig.local_base_path
+    $localPattern = $localPattern -replace '\{year\}', $year
+    $localPattern = $localPattern -replace '\{month\}', $month
+    $localPattern = $localPattern -replace '\{day\}', $day
+    
+    # Construir estructura S3
+    $s3Structure = if ($SyncConfig.destination_config -and $SyncConfig.destination_config.s3_path_structure) { 
+        $SyncConfig.destination_config.s3_path_structure 
+    } elseif ($SyncConfig.s3_path_structure) { 
+        # Compatibilidad hacia atrás
+        $SyncConfig.s3_path_structure 
+    } else { 
+        "custom/{year}/{month}/{day}"
+    }
+    
+    # Reemplazar placeholders en la estructura S3
+    $s3Structure = $s3Structure -replace '\{year\}', $year
+    $s3Structure = $s3Structure -replace '\{month\}', $month
+    $s3Structure = $s3Structure -replace '\{day\}', $day
+    
+    # Obtener bucket name
+    $bucketName = if ($SyncConfig.destination_config -and $SyncConfig.destination_config.bucket_name) { 
+        $SyncConfig.destination_config.bucket_name 
+    } else { 
+        $SyncConfig.bucket_name 
+    }
+    
+    $s3Destination = "s3://$bucketName/$s3Structure"
+    
+    return @{
+        LocalPath = $localPattern
+        S3Path = $s3Destination
+        DayFolder = "custom-pattern"
+        ConfigName = $SyncConfig.name
+        StrategyType = "CustomPattern"
+    }
+}
+
+# Función: Validar configuración de estrategia de sincronización
+function Test-SyncStrategyConfiguration {
+    param (
+        [PSCustomObject] $SyncConfig
+    )
+    
+    # Obtener tipo de estrategia con compatibilidad hacia atrás
+    $strategyType = if ($SyncConfig.sync_strategy -and $SyncConfig.sync_strategy.type) { 
+        $SyncConfig.sync_strategy.type 
+    } elseif ($SyncConfig.sync_mode) { 
+        $SyncConfig.sync_mode 
+    } else { 
+        "DateFolder" 
+    }
+    
+    $issues = @()
+    
+    switch ($strategyType) {
+        "DateFolder" {
+            # Validaciones para estrategia DateFolder
+            if (-not $SyncConfig.local_base_path) {
+                $issues += "local_base_path es requerido para estrategia DateFolder"
+            }
+        }
+        "FullDirectory" {
+            # Validaciones para estrategia FullDirectory
+            if (-not $SyncConfig.local_base_path) {
+                $issues += "local_base_path es requerido para estrategia FullDirectory"
+            }
+        }
+        "DateRange" {
+            # Validaciones para estrategia DateRange
+            if (-not $SyncConfig.local_base_path) {
+                $issues += "local_base_path es requerido para estrategia DateRange"
+            }
+            
+            # Verificar configuración específica de DateRange
+            $daysBack = if ($SyncConfig.sync_strategy -and $SyncConfig.sync_strategy.date_range_days_back) { 
+                $SyncConfig.sync_strategy.date_range_days_back 
+            } elseif ($SyncConfig.mode_config -and $SyncConfig.mode_config.date_range_days_back) { 
+                $SyncConfig.mode_config.date_range_days_back 
+            } else { 
+                $null 
+            }
+            
+            if ($daysBack -and $daysBack -lt 1) {
+                $issues += "sync_strategy.date_range_days_back debe ser mayor a 0 para estrategia DateRange"
+            }
+        }
+        "CustomPattern" {
+            # Validaciones para estrategia CustomPattern
+            $hasCustomPattern = ($SyncConfig.sync_strategy -and $SyncConfig.sync_strategy.custom_local_pattern) -or 
+                              ($SyncConfig.mode_config -and $SyncConfig.mode_config.custom_local_pattern)
+            
+            if (-not $hasCustomPattern -and -not $SyncConfig.local_base_path) {
+                $issues += "sync_strategy.custom_local_pattern o local_base_path es requerido para estrategia CustomPattern"
+            }
+        }
+        default {
+            $issues += "Estrategia de sincronización '$strategyType' no es válida. Estrategias válidas: DateFolder, FullDirectory, DateRange, CustomPattern"
+        }
+    }
+    
+    return @{
+        IsValid = ($issues.Count -eq 0)
+        Issues = $issues
+        StrategyType = $strategyType
     }
 }
 
@@ -391,5 +688,115 @@ function Remove-FolderForced {
     Write-Host "2. Cerrar este terminal de PowerShell y abrir uno nuevo" -ForegroundColor Red
     Write-Host "3. Reiniciar el sistema" -ForegroundColor Red
     return $false
+}
+
+# Función: Mostrar información sobre las estrategias de sincronización disponibles
+function Show-SyncStrategies {
+    Write-Log -Message "=== ESTRATEGIAS DE SINCRONIZACIÓN DISPONIBLES ===" -Level "INFO"
+    
+    Write-Log -Message "1. DateFolder (Predeterminada)"
+    Write-Log -Message "   - Sincroniza carpeta específica del día (formato fecha configurable)"
+    Write-Log -Message "   - Ejemplo: C:\Datos\2025-01-15 -> s3://bucket/2025/01/15/"
+    Write-Log -Message "   - Configuración: sync_strategy: { type: 'DateFolder' }"
+    Write-Log -Message "   - Opciones: date_folder_format (yyyy-MM-dd por defecto)"
+    Write-Log -Message ""
+    
+    Write-Log -Message "2. FullDirectory"
+    Write-Log -Message "   - Sincroniza toda la carpeta base, sin importar la estructura"
+    Write-Log -Message "   - Ejemplo: C:\Datos\ (completa) -> s3://bucket/full-backup/2025/01/"
+    Write-Log -Message "   - Configuración: sync_strategy: { type: 'FullDirectory' }"
+    Write-Log -Message "   - Útil para backups completos periódicos"
+    Write-Log -Message ""
+    
+    Write-Log -Message "3. DateRange"
+    Write-Log -Message "   - Sincroniza carpeta base incluyendo archivos de un rango de fechas"
+    Write-Log -Message "   - Ejemplo: últimos 7 días de C:\Logs\ -> s3://bucket/date-range/2025/01/"
+    Write-Log -Message "   - Configuración: sync_strategy: { type: 'DateRange' }"
+    Write-Log -Message "   - Opciones: date_range_days_back (7 por defecto)"
+    Write-Log -Message ""
+    
+    Write-Log -Message "4. CustomPattern"
+    Write-Log -Message "   - Sincroniza usando un patrón personalizado de carpetas"
+    Write-Log -Message "   - Ejemplo: C:\Reportes\2025\01 -> s3://bucket/reportes/2025/01/"
+    Write-Log -Message "   - Configuración: sync_strategy: { type: 'CustomPattern' }"
+    Write-Log -Message "   - Opciones: custom_local_pattern con placeholders {base_path}, {year}, {month}, {day}"
+    Write-Log -Message ""
+    
+    Write-Log -Message "PLACEHOLDERS DISPONIBLES:"
+    Write-Log -Message "   {base_path} - Ruta base configurada"
+    Write-Log -Message "   {year}      - Año actual (yyyy)"
+    Write-Log -Message "   {month}     - Mes actual (MM)"
+    Write-Log -Message "   {day}       - Día actual (dd)"
+    Write-Log -Message ""
+    
+    Write-Log -Message "=== FIN INFORMACIÓN DE ESTRATEGIAS ==="
+}
+
+# Función: Obtener configuración predeterminada para una estrategia específica
+function Get-DefaultSyncStrategyConfig {
+    param (
+        [ValidateSet("DateFolder", "FullDirectory", "DateRange", "CustomPattern")]
+        [string] $StrategyType
+    )
+    
+    switch ($StrategyType) {
+        "DateFolder" {
+            return @{
+                sync_strategy = @{
+                    type = "DateFolder"
+                    date_folder_format = "yyyy-MM-dd"
+                }
+                destination_config = @{
+                    s3_path_structure = "{year}/{month}/{day}"
+                }
+                description = "Configuración por defecto para sincronización de carpetas diarias"
+            }
+        }
+        "FullDirectory" {
+            return @{
+                sync_strategy = @{
+                    type = "FullDirectory"
+                }
+                destination_config = @{
+                    s3_path_structure = "full-backup/{year}/{month}"
+                }
+                description = "Configuración por defecto para sincronización completa de directorio"
+            }
+        }
+        "DateRange" {
+            return @{
+                sync_strategy = @{
+                    type = "DateRange"
+                    date_range_days_back = 7
+                }
+                destination_config = @{
+                    s3_path_structure = "date-range/{year}/{month}"
+                }
+                description = "Configuración por defecto para sincronización por rango de fechas"
+            }
+        }
+        "CustomPattern" {
+            return @{
+                sync_strategy = @{
+                    type = "CustomPattern"
+                    custom_local_pattern = "{base_path}\\{year}\\{month}"
+                }
+                destination_config = @{
+                    s3_path_structure = "custom/{year}/{month}"
+                }
+                description = "Configuración por defecto para sincronización con patrón personalizado"
+            }
+        }
+    }
+}
+
+# Función: Validar que una estrategia de sincronización existe
+function Test-SyncStrategyExists {
+    param (
+        [string] $StrategyType
+    )
+    
+    $validStrategies = @("DateFolder", "FullDirectory", "DateRange", "CustomPattern")
+    return $validStrategies -contains $StrategyType
 }
 #endregion 
