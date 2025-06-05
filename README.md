@@ -9,13 +9,16 @@ Sistema automatizado para sincronizar múltiples carpetas diarias con diferentes
    .\src\install-requirements.ps1
    ```
 
-2. **Configurar AWS CLI** (si no tienes credenciales):
+2. **Configurar AWS CLI**:
    ```bash
    aws configure
+   # O configurar múltiples profiles:
+   aws configure --profile empresa
    ```
 
 3. **Configurar sincronización**:
-   - Edita `sync-config.yaml` con tus rutas y buckets
+   - Copia `sync-config.yaml.example` a `sync-config.yaml`
+   - Edita con tus rutas, buckets y profiles
 
 4. **Ejecutar**:
    ```powershell
@@ -38,6 +41,7 @@ sync_configurations:
     enabled: true
     local_base_path: "C:\\MisCarpetas"
     bucket_name: "mi-bucket-s3"
+    aws_profile: "default"  # Profile de AWS a usar
     s3_path_structure: "{year}/{month}/{day}"
     date_folder_format: "yyyy-MM-dd"
     sync_options:
@@ -47,6 +51,7 @@ sync_configurations:
 ### Parámetros principales:
 - **`local_base_path`**: Carpeta donde están tus carpetas diarias (ej: `C:\Documentos`)
 - **`bucket_name`**: Nombre del bucket S3 (sin `s3://`)
+- **`aws_profile`**: Profile de AWS a usar (`"default"` o nombre específico)
 - **`s3_path_structure`**: Cómo organizar en S3. Usa `{year}`, `{month}`, `{day}`
 - **`date_folder_format`**: Formato de tus carpetas de fecha local
 - **`sync_options`**: Opciones adicionales de AWS CLI (excluir archivos, etc.)
@@ -77,7 +82,13 @@ Para ejecutar automáticamente cada día:
 ```
 ├── sync-main.ps1          # Script principal
 ├── sync-config.yaml       # Tu configuración
+├── sync-config.yaml.example # Ejemplos de configuración
 ├── src/                   # Código del sistema
+│   ├── config.ps1         #   Manejo de configuración
+│   ├── utils.ps1          #   Utilidades y AWS S3
+│   ├── logging.ps1        #   Sistema de logging
+│   ├── state-manager.ps1  #   Manejo de estado
+│   └── sync-service.ps1   #   Servicios de sincronización
 ├── log/                   # Logs automáticos
 └── state.json             # Estado de sincronizaciones
 ```

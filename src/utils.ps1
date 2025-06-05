@@ -69,12 +69,21 @@ function Invoke-S3Sync {
     param (
         [string] $LocalPath,
         [string] $S3Path,
-        [string[]] $SyncOptions = @()
+        [string[]] $SyncOptions = @(),
+        [string] $AwsProfile = "default"
     )
     
     try {
         # Construir comando base
-        $syncCommand = "aws s3 sync `"$LocalPath`" `"$S3Path`""
+        $syncCommand = "aws s3 sync"
+        
+        # Agregar profile si no es "default"
+        if ($AwsProfile -and $AwsProfile -ne "default") {
+            $syncCommand += " --profile `"$AwsProfile`""
+        }
+        
+        # Agregar rutas
+        $syncCommand += " `"$LocalPath`" `"$S3Path`""
         
         # Agregar opciones adicionales si existen
         if ($SyncOptions -and $SyncOptions.Count -gt 0) {

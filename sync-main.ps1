@@ -35,7 +35,7 @@ param(
 )
 
 #region Importación de Módulos
-# Importar archivos de configuración y funciones desde la carpeta src
+# Importar funciones desde archivos especializados
 . (Join-Path $PSScriptRoot "src\config.ps1")
 . (Join-Path $PSScriptRoot "src\utils.ps1")
 . (Join-Path $PSScriptRoot "src\logging.ps1")

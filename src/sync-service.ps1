@@ -34,7 +34,8 @@ function Start-SyncProcess {
     
     # Ejecutar sincronización con opciones específicas
     $syncOptions = if ($SyncConfig.sync_options) { $SyncConfig.sync_options } else { @() }
-    $syncResult = Invoke-S3Sync -LocalPath $syncPaths.LocalPath -S3Path $syncPaths.S3Path -SyncOptions $syncOptions
+    $awsProfile = if ($SyncConfig.aws_profile) { $SyncConfig.aws_profile } else { "default" }
+    $syncResult = Invoke-S3Sync -LocalPath $syncPaths.LocalPath -S3Path $syncPaths.S3Path -SyncOptions $syncOptions -AwsProfile $awsProfile
     
     if ($syncResult.Success) {
         Write-Log -Message "[$($SyncConfig.name)] Sincronización exitosa."

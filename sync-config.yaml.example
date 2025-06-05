@@ -21,6 +21,7 @@ sync_configurations:
   enabled: true
   local_base_path: "C:\\Datos\\Documentos"
   bucket_name: "corp-documentos-backup"
+  aws_profile: "default" # Profile de AWS a usar. Si es "default", se omite --profile en el comando
   s3_path_structure: "{year}/{month}/{day}" # Opcional: personalizar estructura S3
   date_folder_format: "yyyy-MM-dd" # Formato de carpetas de fecha
   sync_options:
@@ -32,6 +33,7 @@ sync_configurations:
   enabled: true
   local_base_path: "D:\\Fotos\\Diarias"
   bucket_name: "fotos-backup-s3"
+  aws_profile: "personal" # Usa profile específico: aws s3 sync --profile personal
   s3_path_structure: "fotos/{year}/{month}/{day}"
   date_folder_format: "yyyy-MM-dd"
   sync_options:
@@ -42,6 +44,7 @@ sync_configurations:
   enabled: false # Deshabilitado
   local_base_path: "C:\\Logs\\Sistema"
   bucket_name: "sistema-logs-backup"
+  aws_profile: "empresa" # Usa profile específico: aws s3 sync --profile empresa
   s3_path_structure: "logs/{year}/{month}/{day}"
   date_folder_format: "yyyy-MM-dd"
   sync_options:
@@ -53,6 +56,7 @@ sync_configurations:
   enabled: true
   local_base_path: "E:\\Ventas\\Diario"
   bucket_name: "ventas-data-backup"
+  aws_profile: "default" # Profile default - no se agrega --profile al comando
   s3_path_structure: "ventas/{year}/{month}/{day}"
   date_folder_format: "yyyy-MM-dd"
   sync_options: [] # Sin opciones adicionales 
