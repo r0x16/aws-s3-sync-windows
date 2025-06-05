@@ -2,6 +2,43 @@
 
 Sistema automatizado para sincronizar múltiples carpetas diarias con diferentes buckets de AWS S3.
 
+## 🌟 ¡NUEVA VERSIÓN MOCHOK DISPONIBLE!
+
+La aplicación ha sido completamente reorganizada como **Mochok**, un sistema modular y fácil de usar. 
+
+**Para usar la nueva versión:**
+- Archivo principal: `mochok.ps1` 
+- Comandos: `sync`, `status`, `strategies`, `install`, `clear logs`
+- **📖 Documentación completa: [README-MOCHOK.md](README-MOCHOK.md)**
+
+**Migración simple:**
+- `.\sync-main.ps1` → `.\mochok.ps1 sync`
+- `.\show-status.ps1` → `.\mochok.ps1 status`
+- `.\show-sync-strategies.ps1` → `.\mochok.ps1 strategies`
+- `.\clean-logs.ps1` → `.\mochok.ps1 "clear logs"`
+
+**Ejemplos de la nueva sintaxis:**
+```powershell
+# Ver ayuda
+.\mochok.ps1 help
+
+# Instalar prerrequisitos
+.\mochok.ps1 install
+
+# Ver estrategias disponibles
+.\mochok.ps1 strategies -ShowExamples
+
+# Ejecutar sincronización
+.\mochok.ps1 sync
+
+# Ver estado del sistema
+.\mochok.ps1 status
+```
+
+---
+
+## Documentación Heredada (Versión Anterior)
+
 ## 🚀 Instalación Rápida
 
 1. **Instalar prerrequisitos**:
