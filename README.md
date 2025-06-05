@@ -100,4 +100,4 @@ Instalar desde: https://aws.amazon.com/cli/
 
 ---
 
-📖 **Documentación detallada**: Ver `src/README-detailed.md` 
+📖 **Documentación detallada**: Ver `src/README.md` 
