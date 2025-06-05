@@ -1,290 +1,192 @@
-# AWS S3 Sync - Sincronización Multi-Configuración
+# 🌟 Mochok - AWS S3 Sync System
 
-Sistema automatizado para sincronizar múltiples carpetas diarias con diferentes buckets de AWS S3.
+> **[🇪🇸 Leer en Español](README-ES.md)** | English
 
-## 🌟 ¡NUEVA VERSIÓN MOCHOK DISPONIBLE!
+Mochok is a modular system for synchronizing files with AWS S3, designed to be easy to use and highly configurable.
 
-La aplicación ha sido completamente reorganizada como **Mochok**, un sistema modular y fácil de usar. 
+## 🚀 Quick Start
 
-**Para usar la nueva versión:**
-- Archivo principal: `mochok.ps1` 
-- Comandos: `sync`, `status`, `strategies`, `install`, `clear logs`
-- **📖 Documentación completa: [README-MOCHOK.md](README-MOCHOK.md)**
-
-**Migración simple:**
-- `.\sync-main.ps1` → `.\mochok.ps1 sync`
-- `.\show-status.ps1` → `.\mochok.ps1 status`
-- `.\show-sync-strategies.ps1` → `.\mochok.ps1 strategies`
-- `.\clean-logs.ps1` → `.\mochok.ps1 "clear logs"`
-
-**Ejemplos de la nueva sintaxis:**
-```powershell
-# Ver ayuda
-.\mochok.ps1 help
-
-# Instalar prerrequisitos
-.\mochok.ps1 install
-
-# Ver estrategias disponibles
-.\mochok.ps1 strategies -ShowExamples
-
-# Ejecutar sincronización
-.\mochok.ps1 sync
-
-# Ver estado del sistema
-.\mochok.ps1 status
-```
-
----
-
-## Documentación Heredada (Versión Anterior)
-
-## 🚀 Instalación Rápida
-
-1. **Instalar prerrequisitos**:
+1. **Install prerequisites**:
    ```powershell
-   .\src\install-requirements.ps1
+   .\mochok.ps1 install
    ```
 
-2. **Configurar AWS CLI**:
+2. **Configure AWS CLI**:
    ```bash
    aws configure
-   # O configurar múltiples profiles:
-   aws configure --profile empresa
    ```
 
-3. **Configurar sincronización**:
-   - Copia `sync-config.yaml.example` a `sync-config.yaml`
-   - Edita con tus rutas, buckets y profiles
+3. **Configure synchronization**:
+   - Copy `sync-config.yaml.example` to `sync-config.yaml`
+   - Edit with your paths, buckets and profiles
 
-4. **Ejecutar**:
+4. **Run synchronization**:
    ```powershell
-   .\sync-main.ps1
+   .\mochok.ps1 sync
    ```
 
-## ⚙️ Configuración
+## 📋 Commands
 
-Edita el archivo `sync-config.yaml`:
+### `sync` - Main Synchronization
+```powershell
+.\mochok.ps1 sync
+.\mochok.ps1 sync -TargetDate (Get-Date "2025-01-15")
+```
+
+### `status` - System Status
+```powershell
+.\mochok.ps1 status
+.\mochok.ps1 status -OnlyLastExecution
+.\mochok.ps1 status -JsonOutput
+```
+
+### `strategies` - Sync Strategies
+```powershell
+.\mochok.ps1 strategies
+.\mochok.ps1 strategies -ShowExamples
+```
+
+### `install` - Install Prerequisites
+```powershell
+.\mochok.ps1 install
+```
+
+### `"clear logs"` - Clean Logs
+```powershell
+.\mochok.ps1 "clear logs"
+.\mochok.ps1 "clear logs" -KeepLastDays 30
+.\mochok.ps1 "clear logs" -RemoveDirectory
+```
+
+### `help` - Help
+```powershell
+.\mochok.ps1 help
+```
+
+## ⚙️ Configuration
+
+Edit the `sync-config.yaml` file:
 
 ```yaml
-# Configuración global
 global:
   log_retention_months: 12
 
-# Configuraciones de sincronización
 sync_configurations:
-  - name: "Mi Backup"
-    description: "Backup diario de documentos"
+  - name: "Daily Documents"
+    description: "Daily document backup"
     enabled: true
-    local_base_path: "C:\\MisCarpetas"
+    local_base_path: "C:\\MyFolders"
     
-    # Estrategia de sincronización
     sync_strategy:
       type: "DateFolder"
       date_folder_format: "yyyy-MM-dd"
     
-    # Configuración del destino AWS S3
     destination_config:
-      bucket_name: "mi-bucket-s3"
-      aws_profile: "default"  # Profile de AWS a usar
+      bucket_name: "my-s3-bucket"
+      aws_profile: "default"
       s3_path_structure: "{year}/{month}/{day}"
     
     sync_options:
       - "--exclude=*.tmp"
 ```
 
-### 🎯 Estrategias de Sincronización
+### Configuration Parameters
 
-**¡Nueva funcionalidad!** El sistema ahora soporta múltiples estrategias de sincronización organizadas profesionalmente:
+- **`local_base_path`**: Base folder for synchronization
+- **`sync_strategy`**: Strategy configuration
+  - **`type`**: Strategy type (`DateFolder`, `FullDirectory`, `DateRange`, `CustomPattern`)
+  - **`date_folder_format`**: Date folder format (DateFolder strategy only)
+  - **`custom_local_pattern`**: Custom pattern (CustomPattern strategy only)
+  - **`date_range_days_back`**: Days back (DateRange strategy only)
+- **`destination_config`**: AWS S3 destination configuration
+  - **`bucket_name`**: S3 bucket name (created automatically if it doesn't exist)
+  - **`aws_profile`**: AWS profile to use
+  - **`aws_region`**: AWS region (optional, auto-detected)
+  - **`s3_path_structure`**: S3 organization structure using `{year}`, `{month}`, `{day}`
+- **`sync_options`**: Additional AWS CLI options
 
-#### 1. **DateFolder** (Predeterminada)
-Sincroniza carpeta específica del día anterior:
+## 🎯 Sync Strategies
+
+### 1. DateFolder (Default)
+Syncs specific day folder with configurable date format.
 ```yaml
 sync_strategy:
   type: "DateFolder"
-  date_folder_format: "yyyy-MM-dd"  # Formato de carpetas
+  date_folder_format: "yyyy-MM-dd"
 ```
 
-#### 2. **FullDirectory**
-Sincroniza toda la carpeta base completa:
+### 2. FullDirectory
+Syncs entire base folder.
 ```yaml
 sync_strategy:
   type: "FullDirectory"
-# Sincroniza todo el contenido de local_base_path
 ```
 
-#### 3. **DateRange**
-Sincroniza archivos de un rango de fechas:
+### 3. DateRange
+Syncs files from a date range.
 ```yaml
 sync_strategy:
   type: "DateRange"
-  date_range_days_back: 7  # Últimos 7 días
+  date_range_days_back: 7
 ```
 
-#### 4. **CustomPattern**
-Sincroniza usando patrón personalizado:
+### 4. CustomPattern
+Uses custom patterns for sync paths.
 ```yaml
 sync_strategy:
   type: "CustomPattern"
   custom_local_pattern: "{base_path}\\{year}\\{month}"
 ```
 
-**Ver todas las estrategias disponibles**:
-```powershell
-.\show-sync-strategies.ps1
-.\show-sync-strategies.ps1 -ShowExamples
-```
+## ⏰ Automatic Scheduling
 
-### Parámetros principales:
-- **`local_base_path`**: Carpeta base para sincronización
-- **`sync_strategy`**: Configuración de la estrategia de sincronización
-  - **`type`**: Tipo de estrategia (`DateFolder`, `FullDirectory`, `DateRange`, `CustomPattern`)
-  - **`date_folder_format`**: Formato de carpetas de fecha (solo estrategia DateFolder)
-  - **`custom_local_pattern`**: Patrón personalizado (solo estrategia CustomPattern)
-  - **`date_range_days_back`**: Días hacia atrás (solo estrategia DateRange)
-- **`destination_config`**: Configuración del destino AWS S3
-  - **`bucket_name`**: Nombre del bucket S3 (sin `s3://`) - **Se crea automáticamente si no existe**
-  - **`aws_profile`**: Profile de AWS a usar (`"default"` o nombre específico)
-  - **`aws_region`**: Región AWS donde crear el bucket (opcional, se detecta automáticamente)
-  - **`s3_path_structure`**: Cómo organizar en S3. Usa `{year}`, `{month}`, `{day}`
-- **`sync_options`**: Opciones adicionales de AWS CLI (excluir archivos, etc.)
+To run automatically every day, use Windows Task Scheduler:
 
-## 🔄 Uso
+1. Open **Task Scheduler**
+2. Create new basic task
+3. Configure:
+   - **Program**: `powershell.exe`
+   - **Arguments**: `-File "C:\full\path\mochok.ps1" sync`
+   - **Start in**: `C:\full\path\`
 
-```powershell
-# Sincronizar día anterior (por defecto)
-.\sync-main.ps1
-
-# Sincronizar fecha específica
-.\sync-main.ps1 -TargetDate (Get-Date "2024-12-15")
-```
-
-## ☁️ Creación Automática de Buckets S3
-
-**¡Nueva funcionalidad!** El sistema ahora verifica automáticamente si los buckets S3 existen y los crea si es necesario.
-
-### Características:
-- **Verificación automática**: Antes de cada sincronización, se verifica si el bucket existe
-- **Creación inteligente**: Si no existe, se crea usando el profile y región configurados
-- **Configuraciones de seguridad**: Los buckets se crean con:
-  - ✅ Versionado habilitado
-  - ✅ Cifrado AES256 por defecto
-  - ✅ Configuración de región apropiada
-
-### Configuración de región:
-```yaml
-sync_configurations:
-  - name: "Mi Backup"
-    destination_config:
-      bucket_name: "mi-nuevo-bucket"
-      aws_profile: "mi-profile"
-      aws_region: "us-west-2"  # Opcional: especifica la región
-    # ... otros parámetros
-```
-
-Si no se especifica `aws_region`, el sistema:
-1. Intentará detectar la región del profile AWS configurado
-2. Usará `us-east-1` como región por defecto
-
-**💡 Para ver ejemplos completos de configuración**, consulta: `sync-config.yaml.example`
-
-## ⏰ Programación Automática
-
-Para ejecutar automáticamente cada día:
-
-1. Abrir **Programador de Tareas de Windows**
-2. Crear nueva tarea básica
-3. Configurar:
-   - **Programa**: `powershell.exe`
-   - **Argumentos**: `-File "C:\ruta\completa\sync-main.ps1"`
-   - **Directorio**: `C:\ruta\completa\`
-
-## 📁 Estructura de Archivos
+## 📁 File Structure
 
 ```
-├── sync-main.ps1                         # Script principal
-├── show-sync-strategies.ps1              # Mostrar estrategias disponibles
-├── show-status.ps1                       # Ver estado y estadísticas
-├── clean-logs.ps1                        # Limpieza de logs antiguos
-├── sync-config.yaml                      # Tu configuración
-├── sync-config.yaml.example              # Guía completa y ejemplos de todas las estrategias
-├── src/                                  # Código del sistema
-│   ├── config.ps1                        #   Manejo de configuración
-│   ├── utils.ps1                         #   Utilidades y estrategias de sync
-│   ├── logging.ps1                       #   Sistema de logging
-│   ├── state-manager.ps1                 #   Manejo de estado
-│   ├── sync-service.ps1                  #   Servicios de sincronización
-│   ├── log-cleaner.ps1                   #   Limpieza de logs
-│   └── install-requirements.ps1          #   Instalación de prerrequisitos
-├── log/                                  # Logs automáticos
-└── state.json                            # Estado de sincronizaciones
+├── mochok.ps1                    # Main application file
+├── sync-config.yaml              # Your configuration
+├── sync-config.yaml.example      # Configuration examples
+├── state.json                    # Sync state
+├── log/                          # Automatic logs
+└── src/                          # System source code
 ```
 
-## 📋 Logs y Estado
+## 📋 Logs and State
 
-- **Logs**: `log/sync_YYYY-MM.log` (un archivo por mes)
-- **Estado**: `state.json` (información de la última copia realizada)
-- **Rotación**: Los logs se limpian automáticamente
+- **Logs**: `log/sync_YYYY-MM.log` (one file per month)
+- **State**: `state.json` (last sync execution information)
+- **Retention**: Logs are automatically cleaned
 
-### 📊 Nuevo Sistema de Estado
+## 🚨 Troubleshooting
 
-El archivo `state.json` ahora registra información **detallada de la última copia realizada**:
-
-```json
-{
-  "lastExecution": {
-    "timestamp": "2025-01-20T10:00:00Z",
-    "success": true,
-    "totalConfigurations": 3,
-    "successfulConfigurations": 2,
-    "failedConfigurations": 1,
-    "targetDate": "2025-01-19",
-    "duration": "00:05:23"
-  },
-  "configurationResults": {
-    "Documentos": {
-      "lastStatus": "Success",
-      "lastMessage": "Sincronización completada. Archivos transferidos: 15",
-      "lastTimestamp": "2025-01-20T10:02:15Z",
-      "localPath": "C:\\Datos\\2025-01-19",
-      "s3Path": "s3://mi-bucket/2025/01/19",
-      "filesTransferred": 15,
-      "duration": "00:02:30"
-    }
-  },
-  "lastSuccessfulSync": {
-    "Documentos": {
-      "timestamp": "2025-01-20T10:02:15Z",
-      "date": "2025-01-19",
-      "filesTransferred": 15
-    }
-  }
-}
-```
-
-### 📈 Comando de Estado
-
-```powershell
-# Ver reporte completo del estado
-.\show-status.ps1
-
-# Ver solo última ejecución
-.\show-status.ps1 -OnlyLastExecution
-
-# Salida en formato JSON
-.\show-status.ps1 -JsonOutput
-```
-
-## ❓ Problemas Comunes
-
-**Error de ejecución de scripts**:
+### Execution Policy Error
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-**AWS CLI no encontrado**:
-Instalar desde: https://aws.amazon.com/cli/
+### AWS CLI Not Configured
+```bash
+aws configure
+```
 
----
+### Verify Prerequisites
+```powershell
+.\mochok.ps1 install
+```
 
-📖 **Documentación detallada**: Ver `src/README.md` 
+## 🤝 Migration from Previous Version
+
+If you had the previous version with `sync-main.ps1`:
+
+1. Use `.\mochok.ps1 sync` instead of `.\sync-main.ps1`
+2. Other scripts are now commands: `status`, `strategies`, etc.
+3. All existing configurations remain the same 
