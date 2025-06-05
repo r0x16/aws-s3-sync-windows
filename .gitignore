@@ -1,50 +1,64 @@
-# Configuration files
+# === Archivos de configuración específicos del usuario ===
+# Archivo de configuración principal (cada usuario tendrá su propia configuración)
 sync-config.yaml
-config.yaml
-*.config
 
-# Log files
-*.log
-logs/
-*.log.*
-
-# State files
+# === Archivos de estado y logs ===
+# Archivos de estado de sincronización
+state.json
 *.state
-*.tmp
-state/
-sync-state.json
 
-# AWS credentials
+# Directorio y archivos de logs
+log/
+*.log
+
+# === Credenciales y configuración AWS ===
+# Credenciales AWS (aunque normalmente están en ~/.aws/)
 .aws/
 aws-credentials.txt
 credentials
+*.pem
+*.key
 
-# PowerShell specific
-*.psm1.bak
-*.ps1.bak
-
-# Temporary files
+# === Archivos temporales y cache ===
+# Archivos temporales generados durante la sincronización
+*.tmp
+*.temp
 temp/
 tmp/
-*.temp
 
-# Backup files
+# === Archivos de backup ===
+# Backups que puedan generarse
 *.backup
 *.bak
 *~
 
-# OS specific
-.DS_Store
+# === Archivos del sistema operativo ===
+# Windows
 Thumbs.db
 desktop.ini
+$RECYCLE.BIN/
 
-# IDE/Editor files
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# === Archivos de desarrollo ===
+# IDE/Editor
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
 
-# Cache files
-*.cache
-cache/ 
+# PowerShell específicos
+*.psm1.bak
+*.ps1.bak
+
+# === Archivos de pruebas y desarrollo ===
+# Directorios de prueba
+test-data/
+test-sync/
+
+# Variables de entorno locales
+.env
+.env.local 
