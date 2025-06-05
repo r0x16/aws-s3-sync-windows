@@ -23,7 +23,17 @@ function Get-State {
             return @()
         }
         else {
-            return $jsonContent | ConvertFrom-Json
+            $result = $jsonContent | ConvertFrom-Json
+            # Asegurar que el resultado sea un array
+            if ($null -eq $result) {
+                return @()
+            }
+            elseif ($result -is [System.Array]) {
+                return $result
+            }
+            else {
+                return @($result)
+            }
         }
     }
     catch {
@@ -74,8 +84,16 @@ function Add-StateEntry {
     )
     
     $stateArray = Get-State
+    # Asegurar que $stateArray es un array
+    if ($null -eq $stateArray) {
+        $stateArray = @()
+    }
+    elseif ($stateArray -isnot [System.Array]) {
+        $stateArray = @($stateArray)
+    }
+    
     $entry = New-StateEntry -Date $Date -Status $Status -Message $Message -ConfigName $ConfigName
-    $stateArray += $entry
+    $stateArray = $stateArray + $entry
     Set-State -StateArray $stateArray
 }
 #endregion 
