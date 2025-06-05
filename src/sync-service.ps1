@@ -17,10 +17,12 @@ function Start-SyncProcess {
     $syncPaths = Get-SyncPaths -Date $TargetDate -SyncConfig $SyncConfig
     
     Write-Log -Message "[$($SyncConfig.name)] Iniciando sincronización de '$($syncPaths.LocalPath)' a '$($syncPaths.S3Path)'."
+    Write-Host "    🔍 Verificando directorio origen..." -ForegroundColor Gray
     
     # Verificar existencia de la carpeta local
     if (-not (Test-Path -LiteralPath $syncPaths.LocalPath)) {
         $msg = "[$($SyncConfig.name)] Carpeta local '$($syncPaths.LocalPath)' no encontrada. Se omite sincronización del día $($syncPaths.DayFolder)."
+        Write-Host "    ⚠️  Directorio no encontrado - sincronización omitida" -ForegroundColor Red
         Write-Log -Message $msg -Level "ERROR"
         
         # Registrar resultado con información detallada
@@ -61,6 +63,8 @@ function Start-SyncProcess {
         $SyncConfig.bucket_name 
     }
     
+    Write-Host "    ☁️  Verificando bucket S3: " -NoNewline -ForegroundColor Gray
+    Write-Host $bucketName -ForegroundColor Cyan
     Write-Log -Message "[$($SyncConfig.name)] Verificando bucket S3: $bucketName"
     $bucketResult = Confirm-S3Bucket -BucketName $bucketName -AwsProfile $awsProfile -Region $bucketRegion
     
@@ -75,23 +79,35 @@ function Start-SyncProcess {
     
     # Registrar el resultado del bucket
     if ($bucketResult.Action -eq "Created") {
+        Write-Host "    ✨ Bucket S3 creado exitosamente en región: " -NoNewline -ForegroundColor Green
+        Write-Host $bucketResult.Region -ForegroundColor Cyan
         Write-Log -Message "[$($SyncConfig.name)] Bucket S3 '$bucketName' creado exitosamente en la región '$($bucketResult.Region)'"
     } elseif ($bucketResult.Action -eq "Exists") {
+        Write-Host "    ✓  Bucket S3 verificado - ya existe" -ForegroundColor Green
         Write-Log -Message "[$($SyncConfig.name)] Bucket S3 '$bucketName' ya existía"
     }
     
     # Contar archivos antes de la sincronización
     $filesBeforeSync = 0
+    Write-Host "    📊 Contando archivos en directorio..." -ForegroundColor Gray
     try {
         $filesBeforeSync = (Get-ChildItem -LiteralPath $syncPaths.LocalPath -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
+        Write-Host "    📁 Archivos encontrados: " -NoNewline -ForegroundColor Gray
+        Write-Host $filesBeforeSync -ForegroundColor Cyan
         Write-Log -Message "[$($SyncConfig.name)] Archivos a sincronizar: $filesBeforeSync"
     }
     catch {
+        Write-Host "    ⚠️  No se pudo contar archivos" -ForegroundColor Yellow
         Write-Log -Message "[$($SyncConfig.name)] No se pudo contar archivos locales: $_" -Level "WARNING"
     }
     
     # Ejecutar sincronización con opciones específicas
     $syncOptions = if ($SyncConfig.sync_options) { $SyncConfig.sync_options } else { @() }
+    Write-Host "    🚀 Iniciando sincronización con AWS S3..." -ForegroundColor Yellow
+    if ($syncOptions.Count -gt 0) {
+        Write-Host "    ⚙️  Opciones: " -NoNewline -ForegroundColor Gray
+        Write-Host ($syncOptions -join ", ") -ForegroundColor DarkYellow
+    }
     $syncResult = Invoke-S3Sync -LocalPath $syncPaths.LocalPath -S3Path $syncPaths.S3Path -SyncOptions $syncOptions -AwsProfile $awsProfile
     
     # Calcular duración
@@ -110,6 +126,8 @@ function Start-SyncProcess {
         }
         
         $successMessage = "Sincronización completada sin errores. Archivos transferidos: $filesTransferred"
+        Write-Host "    📤 Archivos transferidos: " -NoNewline -ForegroundColor Green
+        Write-Host $filesTransferred -ForegroundColor Cyan
         Write-Log -Message "[$($SyncConfig.name)] $successMessage (Duración: $durationString)"
         
         # Registrar resultado exitoso con información detallada
@@ -139,27 +157,56 @@ function Start-AllSyncProcesses {
     $errorCount = [int]0
     
     Write-Log -Message "=== Iniciando sincronización para $totalConfigs configuración(es) ==="
+    Write-Host ""
+    Write-Host "🚀 INICIANDO PROCESO DE SINCRONIZACIÓN" -ForegroundColor Green
+    Write-Host "=" * 50 -ForegroundColor Green
     
     # Inicializar ejecución en el estado
     Start-StateExecution -TargetDate $TargetDate -TotalConfigurations $totalConfigs
     
-    foreach ($config in $configurations) {
+    for ($i = 0; $i -lt $configurations.Count; $i++) {
+        $config = $configurations[$i]
+        $configNum = $i + 1
+        
         try {
+            Write-Host ""
+            Write-Host "[$configNum/$totalConfigs] " -NoNewline -ForegroundColor Cyan
+            Write-Host "🔄 Procesando: " -NoNewline -ForegroundColor Yellow
+            Write-Host "$($config.name)" -ForegroundColor White
+            Write-Host "    📝 " -NoNewline -ForegroundColor Gray
+            Write-Host "$($config.description)" -ForegroundColor Gray
+            
             Write-Log -Message "Procesando configuración: '$($config.name)' - $($config.description)"
+            
+            $configStartTime = Get-Date
             $success = Start-SyncProcess -TargetDate $TargetDate -SyncConfig $config
+            $configEndTime = Get-Date
+            $configDuration = $configEndTime - $configStartTime
             
             if ($success) {
                 $successCount = $successCount + 1
+                Write-Host "    ✅ " -NoNewline -ForegroundColor Green
+                Write-Host "COMPLETADO EXITOSAMENTE" -ForegroundColor Green
+                Write-Host "    ⏱️  Duración: " -NoNewline -ForegroundColor Gray
+                Write-Host $configDuration.ToString("hh\:mm\:ss") -ForegroundColor Cyan
                 Write-Log -Message "[$($config.name)] Configuración procesada exitosamente." -Level "INFO"
             }
             else {
                 $errorCount = $errorCount + 1
+                Write-Host "    ❌ " -NoNewline -ForegroundColor Red
+                Write-Host "ERROR EN SINCRONIZACIÓN" -ForegroundColor Red
+                Write-Host "    ⏱️  Duración: " -NoNewline -ForegroundColor Gray
+                Write-Host $configDuration.ToString("hh\:mm\:ss") -ForegroundColor Cyan
                 Write-Log -Message "[$($config.name)] Error al procesar configuración." -Level "ERROR"
             }
         }
         catch {
             $errorCount = $errorCount + 1
             $errorMsg = "[$($config.name)] Excepción inesperada: $_"
+            Write-Host "    💥 " -NoNewline -ForegroundColor Red
+            Write-Host "EXCEPCIÓN INESPERADA" -ForegroundColor Red
+            Write-Host "    🔍 Error: " -NoNewline -ForegroundColor Gray
+            Write-Host $_ -ForegroundColor Red
             Write-Log -Message $errorMsg -Level "ERROR"
             
             # Registrar excepción en el estado
@@ -174,6 +221,29 @@ function Start-AllSyncProcesses {
     $overallSuccess = ($errorCount -eq 0)
     
     Complete-StateExecution -Success $overallSuccess -Duration $totalDuration
+    
+    # Mostrar resumen final detallado
+    Write-Host ""
+    Write-Host "🏁 RESUMEN FINAL DE SINCRONIZACIÓN" -ForegroundColor Yellow
+    Write-Host "=" * 50 -ForegroundColor Yellow
+    Write-Host "📊 Total configuraciones procesadas: " -NoNewline -ForegroundColor Gray
+    Write-Host $totalConfigs -ForegroundColor White
+    Write-Host "✅ Configuraciones exitosas:        " -NoNewline -ForegroundColor Gray
+    Write-Host $successCount -ForegroundColor Green
+    if ($errorCount -gt 0) {
+        Write-Host "❌ Configuraciones con errores:     " -NoNewline -ForegroundColor Gray
+        Write-Host $errorCount -ForegroundColor Red
+    }
+    Write-Host "⏱️  Duración total:                  " -NoNewline -ForegroundColor Gray
+    Write-Host $totalDuration.ToString("hh\:mm\:ss") -ForegroundColor Cyan
+    Write-Host "🎯 Estado general:                  " -NoNewline -ForegroundColor Gray
+    if ($overallSuccess) {
+        Write-Host "ÉXITO COMPLETO" -ForegroundColor Green
+    } else {
+        Write-Host "COMPLETADO CON ERRORES" -ForegroundColor Red
+    }
+    Write-Host "=" * 50 -ForegroundColor Yellow
+    Write-Host ""
     
     Write-Log -Message "=== Resumen de sincronización: $successCount exitosas, $errorCount con errores (Duración total: $($totalDuration.ToString("hh\:mm\:ss"))) ==="
     
