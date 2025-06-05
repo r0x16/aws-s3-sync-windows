@@ -1,621 +1,726 @@
-# 🔄 AWS S3 Sync - Sistema Modular Multi-Configuración
+# 🏗️ AWS S3 Sync - Architecture & Developer Guide
+
+> **🌐 Language**: English | [Español](README-es.md)
 
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blue?logo=powershell)](https://github.com/PowerShell/PowerShell)
 [![AWS CLI](https://img.shields.io/badge/AWS%20CLI-Required-orange?logo=amazon-aws)](https://aws.amazon.com/cli/)
-[![YAML](https://img.shields.io/badge/Config-YAML-green?logo=yaml)](https://yaml.org/)
+[![Architecture](https://img.shields.io/badge/Architecture-Modular-green)]()
 
-> **Sistema robusto y escalable** para sincronizar automáticamente múltiples carpetas diarias con diferentes buckets de AWS S3, con configuración YAML, manejo de logs, estado persistente y rotación automática.
-
----
-
-## 📋 Tabla de Contenidos
-
-- [🎯 Características Principales](#-características-principales)
-- [🏗️ Arquitectura del Sistema](#️-arquitectura-del-sistema)
-- [📁 Estructura del Proyecto](#-estructura-del-proyecto)
-- [⚙️ Configuración Detallada](#️-configuración-detallada)
-- [🚀 Instalación y Setup](#-instalación-y-setup)
-- [💻 Uso y Ejecución](#-uso-y-ejecución)
-- [📊 Logs y Monitoreo](#-logs-y-monitoreo)
-- [🔧 Mantenimiento](#-mantenimiento)
-- [🛠️ Solución de Problemas](#️-solución-de-problemas)
-- [📈 Programación Automática](#-programación-automática)
+> **Developer Documentation** for the modular AWS S3 synchronization system. This guide focuses on the technical architecture, component design, and development patterns used in the application.
 
 ---
 
-## 🎯 Características Principales
+## 📋 Table of Contents
 
-### ✨ **Funcionalidades Core**
-- 🔄 **Sincronización Multi-Configuración**: Maneja múltiples orígenes locales con diferentes buckets S3
-- 📝 **Configuración YAML**: Archivo de configuración flexible y fácil de mantener
-- 🔁 **Ejecución Secuencial**: Procesa todas las configuraciones en orden definido
-- 📊 **Logs Centralizados**: Sistema de logging unificado con rotación automática mensual
-- 💾 **Estado Persistente**: Seguimiento detallado del estado por configuración
-- ⚙️ **Opciones Personalizadas**: Diferentes parámetros de sincronización por configuración
-- 🗂️ **Estructura S3 Flexible**: Personalización completa de la estructura de carpetas en S3
-
-### 🛡️ **Características de Seguridad y Confiabilidad**
-- ✅ **Validación de Prerrequisitos**: Verificación automática de dependencias
-- 🚨 **Manejo de Errores**: Control exhaustivo de errores con logs detallados
-- 🔄 **Recuperación Automática**: Continuación de proceso aunque falle una configuración
-- 📈 **Monitoreo de Estado**: Historial completo de todas las ejecuciones
-- 🔐 **Integración AWS**: Uso de credenciales AWS existentes de forma segura
+- [🎯 System Overview](#-system-overview)
+- [🏗️ Architecture Patterns](#️-architecture-patterns)
+- [📁 Module Structure](#-module-structure)
+- [🔄 Component Interaction](#-component-interaction)
+- [💾 Data Flow](#-data-flow)
+- [🔧 Development Guidelines](#-development-guidelines)
+- [🛠️ Extension Points](#️-extension-points)
+- [🧪 Testing Strategy](#-testing-strategy)
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## 🎯 System Overview
 
-El sistema está diseñado con una **arquitectura modular** que separa responsabilidades y facilita el mantenimiento:
+The AWS S3 Sync system is built using a **modular architecture** with clear separation of concerns, following PowerShell best practices and enterprise patterns.
+
+### 🎨 **Design Principles**
+
+1. **📦 Single Responsibility**: Each module handles one specific aspect
+2. **🔄 Dependency Injection**: Configuration and dependencies are injected
+3. **💾 State Management**: Persistent state tracking across executions
+4. **🛡️ Error Isolation**: Failures in one component don't affect others
+5. **📊 Observable**: Comprehensive logging and monitoring
+6. **⚙️ Configurable**: YAML-driven configuration management
+
+### 🧱 **Core Components**
 
 ```mermaid
 graph TB
-    A[sync-main.ps1<br/>🎯 Script Principal] --> B[config.ps1<br/>⚙️ Configuración Global]
-    A --> C[utils.ps1<br/>🔧 Utilidades]
-    A --> D[logging.ps1<br/>📝 Sistema de Logs]
-    A --> E[state-manager.ps1<br/>💾 Manejo de Estado]
-    A --> F[sync-service.ps1<br/>🔄 Lógica de Sincronización]
+    A[sync-main.ps1] --> B[Configuration Layer]
+    A --> C[Service Layer]
+    A --> D[Infrastructure Layer]
     
-    B --> G[sync-config.yaml<br/>📋 Configuración YAML]
-    D --> H[log/<br/>📊 Logs Mensuales]
-    E --> I[state.json<br/>📈 Estado Persistente]
-    F --> J[AWS S3<br/>☁️ Buckets de Destino]
+    B --> B1[config.ps1]
+    B --> B2[YAML Parser]
     
-    style A fill:#e1f5fe
-    style G fill:#f3e5f5
-    style H fill:#e8f5e8
-    style I fill:#fff3e0
-    style J fill:#ffebee
-```
-
-### 🔄 **Flujo de Ejecución**
-
-1. **Inicialización** → Carga de módulos y configuración YAML
-2. **Validación** → Verificación de prerrequisitos del sistema
-3. **Procesamiento** → Ejecución secuencial de cada configuración habilitada
-4. **Logging** → Registro detallado de cada operación
-5. **Estado** → Actualización del archivo de estado JSON
-6. **Finalización** → Resumen de resultados y limpieza
-
----
-
-## 📁 Estructura del Proyecto
-
-```
-📦 aws-s3-sync/
-├── 📄 sync-main.ps1              # 🎯 Script principal de ejecución
-├── 📄 sync-config.yaml           # ⚙️ Archivo de configuración YAML
-├── 📄 README.md                  # 📚 Esta documentación
-├── 📄 state.json                 # 📊 Estado del sistema (auto-generado)
-├── 📁 src/                       # 🏗️ Módulos del sistema
-│   ├── 📄 config.ps1             # ⚙️ Configuración global y parser YAML
-│   ├── 📄 utils.ps1              # 🔧 Funciones de utilidad
-│   ├── 📄 logging.ps1            # 📝 Sistema de logging y rotación
-│   ├── 📄 state-manager.ps1      # 💾 Manejo del archivo de estado JSON
-│   ├── 📄 sync-service.ps1       # 🔄 Lógica principal de sincronización
-│   ├── 📄 sync.ps1               # 🔄 Script original (compatibilidad)
-│   └── 📄 install-requirements.ps1 # 📦 Instalación de prerrequisitos
-└── 📁 log/                       # 📊 Logs del sistema (auto-generado)
-    ├── 📄 sync_2025-01.log       # 📅 Log mensual enero 2025
-    ├── 📄 sync_2025-02.log       # 📅 Log mensual febrero 2025
-    └── 📄 ...                    # 📅 Logs mensuales anteriores
+    C --> C1[sync-service.ps1]
+    C --> C2[state-manager.ps1]
+    C --> C3[utils.ps1]
+    
+    D --> D1[logging.ps1]
+    D --> D2[log-cleaner.ps1]
+    D --> D3[Commands]
+    
+    D3 --> E1[sync.ps1]
+    D3 --> E2[status.ps1]
+    D3 --> E3[install.ps1]
+    D3 --> E4[clear-logs.ps1]
+    D3 --> E5[strategies.ps1]
 ```
 
 ---
 
-## ⚙️ Configuración Detallada
+## 🏗️ Architecture Patterns
 
-### 📋 **Archivo de Configuración Principal: `sync-config.yaml`**
+### 🎯 **Layered Architecture**
 
-El sistema utiliza un archivo YAML que define tanto la configuración global como las configuraciones específicas de sincronización:
+The system follows a **3-tier layered architecture**:
 
-#### 🌐 **Configuración Global**
+#### **1. Presentation Layer (Entry Points)**
+- `sync-main.ps1` - Main orchestrator
+- `src/commands/*.ps1` - CLI command implementations
 
-```yaml
-global:
-  log_retention_months: 12        # 📅 Meses de retención de logs
-  log_directory: "log"            # 📁 Directorio de logs
-  state_file: "state.json"        # 💾 Archivo de estado
-```
+#### **2. Business Logic Layer (Services)**
+- `sync-service.ps1` - Core synchronization logic
+- `state-manager.ps1` - State persistence and management
+- `utils.ps1` - Business utilities and AWS operations
 
-| Parámetro | Tipo | Descripción | Valor por Defecto |
-|-----------|------|-------------|-------------------|
-| `log_retention_months` | `int` | Número de meses que se conservan los logs antes de la rotación automática | `12` |
-| `log_directory` | `string` | Carpeta donde se almacenan los logs (relativa al script principal) | `"log"` |
-| `state_file` | `string` | Nombre del archivo JSON donde se guarda el estado del sistema | `"state.json"` |
+#### **3. Infrastructure Layer (Support)**
+- `config.ps1` - Configuration management and YAML parsing
+- `logging.ps1` - Centralized logging infrastructure
+- `log-cleaner.ps1` - Log rotation and cleanup
 
-#### 🔄 **Configuraciones de Sincronización**
+### 🔧 **Module Pattern**
 
-```yaml
-sync_configurations:
-  - name: "Documentos Corporativos"
-    description: "Sincronización de documentos diarios corporativos"
-    enabled: true
-    local_base_path: "C:\\Datos\\Documentos"
-    bucket_name: "corp-documentos-backup"
-    s3_path_structure: "{year}/{month}/{day}"
-    date_folder_format: "yyyy-MM-dd"
-    sync_options:
-      - "--exclude=*.tmp"
-      - "--exclude=*.log"
-```
-
-### 📊 **Parámetros de Configuración de Sincronización**
-
-| Parámetro | Tipo | Requerido | Descripción |
-|-----------|------|-----------|-------------|
-| `name` | `string` | ✅ | **Identificador único** de la configuración. Se usa en logs y estado |
-| `description` | `string` | ✅ | **Descripción** detallada de qué hace esta configuración |
-| `enabled` | `boolean` | ✅ | **Habilitar/Deshabilitar** esta configuración (`true`/`false`) |
-| `local_base_path` | `string` | ✅ | **Ruta base local** donde están las carpetas diarias a sincronizar |
-| `bucket_name` | `string` | ✅ | **Nombre del bucket S3** (sin prefijo `s3://`) |
-| `s3_path_structure` | `string` | ❌ | **Estructura de carpetas en S3**. Usa placeholders: `{year}`, `{month}`, `{day}` |
-| `date_folder_format` | `string` | ❌ | **Formato de las carpetas** de fecha locales (formato .NET) |
-| `sync_options` | `array` | ❌ | **Opciones adicionales** para el comando `aws s3 sync` |
-
-### 🎨 **Placeholders para Estructura S3**
-
-| Placeholder | Descripción | Ejemplo |
-|-------------|-------------|---------|
-| `{year}` | Año de 4 dígitos | `2025` |
-| `{month}` | Mes de 2 dígitos | `01`, `12` |
-| `{day}` | Día de 2 dígitos | `01`, `31` |
-
-**Ejemplos de estructuras S3:**
-- `"{year}/{month}/{day}"` → `2025/01/15`
-- `"backup/{year}/{month}/{day}"` → `backup/2025/01/15`
-- `"datos/{year}/mes-{month}/dia-{day}"` → `datos/2025/mes-01/dia-15`
-
-### 🔧 **Opciones de Sincronización Comunes**
-
-| Opción | Descripción | Ejemplo de Uso |
-|--------|-------------|----------------|
-| `--exclude="*.tmp"` | Excluir archivos temporales | Archivos de trabajo |
-| `--exclude="*.log"` | Excluir archivos de log | Logs del sistema |
-| `--exclude="*.thumbs"` | Excluir miniaturas | Archivos de imágenes |
-| `--include="*.pdf"` | Incluir solo PDFs | Documentos específicos |
-| `--size-only` | Comparar solo por tamaño | Sincronización rápida |
-| `--dryrun` | Simulación sin cambios | Pruebas de configuración |
-
----
-
-## 🚀 Instalación y Setup
-
-### 📋 **Prerrequisitos del Sistema**
-
-- 🖥️ **Windows 10/11** con PowerShell 5.1 o superior
-- ☁️ **AWS CLI** instalado y configurado
-- 🔐 **Credenciales AWS** válidas con permisos S3
-- 📝 **Permisos de escritura** en la carpeta del proyecto
-
-### ⚡ **Instalación Rápida**
-
-1. **📦 Ejecutar Script de Instalación:**
-   ```powershell
-   .\src\install-requirements.ps1
-   ```
-   Este script instala automáticamente:
-   - Módulo PowerShell-Yaml
-   - Validación de AWS CLI
-   - Configuración de permisos de ejecución
-
-2. **🔐 Configurar AWS CLI** (si no está configurado):
-   ```bash
-   aws configure
-   ```
-   Proporcionar:
-   - AWS Access Key ID
-   - AWS Secret Access Key
-   - Región por defecto
-   - Formato de salida (json)
-
-3. **⚙️ Personalizar Configuración:**
-   - Editar `sync-config.yaml` con tus configuraciones específicas
-   - Verificar rutas locales y nombres de buckets
-   - Ajustar opciones de sincronización según necesidades
-
-4. **✅ Verificar Instalación:**
-   ```powershell
-   .\sync-main.ps1 -TargetDate (Get-Date).AddDays(-1)
-   ```
-
-### 🔧 **Configuración Manual de Prerrequisitos**
-
-Si prefieres instalar manualmente:
-
-1. **PowerShell-Yaml:**
-   ```powershell
-   Install-Module -Name powershell-yaml -Force -Scope CurrentUser
-   ```
-
-2. **AWS CLI:**
-   - Descargar desde: https://aws.amazon.com/cli/
-   - Verificar instalación: `aws --version`
-
-3. **Permisos de Ejecución:**
-   ```powershell
-   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-   ```
-
----
-
-## 💻 Uso y Ejecución
-
-### 🎯 **Ejecución del Script Principal**
-
-El archivo `sync-main.ps1` es el punto de entrada principal del sistema:
-
-#### **Uso Básico:**
+Each PowerShell module follows a consistent structure:
 
 ```powershell
-# Sincronizar día anterior (comportamiento por defecto)
-.\sync-main.ps1
+#region Module Header
+# Description and purpose
+#endregion
 
-# Sincronizar fecha específica
-.\sync-main.ps1 -TargetDate (Get-Date "2025-01-15")
+#region Private Functions
+# Internal implementation details
+#endregion
 
-# Sincronizar hace 3 días
-.\sync-main.ps1 -TargetDate (Get-Date).AddDays(-3)
+#region Public Functions
+# Exported API functions
+#endregion
+
+#region Initialization
+# Module setup and validation
+#endregion
 ```
 
-#### **Parámetros del Script:**
+### 💾 **State Management Pattern**
 
-| Parámetro | Tipo | Descripción | Valor por Defecto |
-|-----------|------|-------------|-------------------|
-| `TargetDate` | `DateTime` | Fecha específica para sincronizar | Día anterior |
-
-### 🔄 **Flujo de Procesamiento**
-
-1. **🔍 Carga de Configuración:**
-   - Lee `sync-config.yaml`
-   - Valida estructura y parámetros
-   - Filtra configuraciones habilitadas
-
-2. **✅ Validación de Prerrequisitos:**
-   - Verifica AWS CLI disponible
-   - Comprueba credenciales AWS
-   - Valida permisos de escritura
-
-3. **🔄 Procesamiento Secuencial:**
-   - Itera sobre cada configuración habilitada
-   - Construye rutas local y S3
-   - Ejecuta sincronización
-   - Registra resultado en estado y logs
-
-4. **📊 Finalización:**
-   - Genera resumen de resultados
-   - Actualiza estado global
-   - Rota logs antiguos
-
-### 📁 **Estructura de Carpetas Esperada**
-
-El sistema espera que las carpetas locales sigan el formato de fecha especificado:
-
-```
-C:\Datos\Documentos\
-├── 📁 2025-01-13/
-├── 📁 2025-01-14/
-├── 📁 2025-01-15/
-└── 📁 2025-01-16/
-```
-
----
-
-## 📊 Logs y Monitoreo
-
-### 📝 **Sistema de Logs**
-
-El sistema genera logs mensuales detallados en la carpeta `log/`:
-
-#### **Estructura de Logs:**
-```
-log/
-├── 📄 sync_2025-01.log    # Log del mes actual
-├── 📄 sync_2024-12.log    # Log del mes anterior
-└── 📄 sync_2024-11.log    # Logs históricos
-```
-
-#### **Formato de Entradas de Log:**
-```
-[2025-01-20 10:00:00] [INFO] === Iniciando proceso de sincronización AWS S3 ===
-[2025-01-20 10:00:01] [INFO] Procesando configuración: 'Documentos Corporativos'
-[2025-01-20 10:00:02] [SUCCESS] [Documentos Corporativos] Sincronización exitosa
-[2025-01-20 10:00:03] [ERROR] [Fotos Diarias] Error: Carpeta no encontrada
-```
-
-#### **Niveles de Log:**
-
-| Nivel | Icono | Descripción | Cuándo se Usa |
-|-------|-------|-------------|---------------|
-| `INFO` | ℹ️ | Información general | Inicio/fin de procesos, estados |
-| `SUCCESS` | ✅ | Operación exitosa | Sincronizaciones completadas |
-| `WARNING` | ⚠️ | Advertencia | Configuraciones deshabilitadas |
-| `ERROR` | ❌ | Error | Fallos en sincronización |
-
-### 💾 **Archivo de Estado: `state.json`**
-
-Mantiene un historial completo de todas las ejecuciones:
+The system implements a **persistent state pattern** using JSON:
 
 ```json
 {
+  "lastExecution": { /* Global execution state */ },
+  "configurationHistory": [ /* Per-config state history */ ]
+}
+```
+
+---
+
+## 📁 Module Structure
+
+### ⚙️ **config.ps1 - Configuration Management**
+
+**Purpose**: Centralized configuration loading and management
+
+**Key Components**:
+- `SyncConfiguration` class - Configuration container
+- YAML parsing with `powershell-yaml` module
+- Configuration validation and defaults
+
+**Architecture Pattern**: Singleton Configuration Manager
+
+```powershell
+# Core class design
+class SyncConfiguration {
+    [string]$ConfigFile
+    [int]$LogRetentionMonths
+    [string]$LogDir
+    [string]$StateFile
+    [array]$SyncConfigurations
+}
+```
+
+**Public API**:
+- `Import-YamlConfig()` - Load configuration from YAML
+- `Get-EnabledSyncConfigurations()` - Get active sync configs
+- `Get-LogDirectory()`, `Get-StateFile()` - Configuration accessors
+
+### 🔄 **sync-service.ps1 - Core Business Logic**
+
+**Purpose**: Orchestrates the synchronization process
+
+**Key Components**:
+- Process orchestration
+- AWS S3 interaction
+- Error handling and recovery
+- Result aggregation
+
+**Architecture Pattern**: Service Layer with Command Pattern
+
+```powershell
+# Main orchestration functions
+function Start-AllSyncProcesses($TargetDate)    # Process all configs
+function Start-SyncProcess($TargetDate, $Config) # Process single config
+```
+
+**Workflow Design**:
+1. **Validation Phase**: Check prerequisites and paths
+2. **Execution Phase**: Run AWS S3 sync with options
+3. **Result Phase**: Capture and log results
+4. **State Phase**: Update persistent state
+
+### 💾 **state-manager.ps1 - State Persistence**
+
+**Purpose**: Manages application state across executions
+
+**Key Components**:
+- JSON-based state persistence
+- Execution history tracking
+- Configuration-specific state management
+- State reporting and analytics
+
+**Architecture Pattern**: Repository Pattern for State
+
+```powershell
+# State operations
+function Get-State()                    # Load current state
+function Set-State($StateData)          # Persist state
+function Start-StateExecution($Date)    # Begin new execution
+function Set-ConfigurationResult(...)   # Record config result
+function Get-StateReport()              # Generate state report
+```
+
+**State Schema**:
+```json
+{
   "lastExecution": {
-    "timestamp": "2025-01-20T10:00:00.000Z",
-    "success": true,
-    "totalConfigurations": 4,
-    "successfulConfigurations": 3,
-    "failedConfigurations": 1
+    "timestamp": "ISO-8601",
+    "success": "boolean",
+    "totalConfigurations": "number",
+    "successfulConfigurations": "number",
+    "failedConfigurations": "number"
   },
-  "configurationHistory": [
-    {
-      "name": "Documentos Corporativos",
-      "timestamp": "2025-01-20T10:00:02.000Z",
-      "targetDate": "2025-01-19",
-      "success": true,
-      "localPath": "C:\\Datos\\Documentos\\2025-01-19",
-      "s3Path": "s3://corp-documentos-backup/2025/01/19",
-      "duration": "00:00:04",
-      "filesTransferred": 15,
-      "message": "Sincronización exitosa"
+  "configurationHistory": [{
+    "name": "string",
+    "timestamp": "ISO-8601",
+    "targetDate": "string",
+    "success": "boolean",
+    "localPath": "string",
+    "s3Path": "string",
+    "duration": "timespan",
+    "filesTransferred": "number",
+    "message": "string"
+  }]
+}
+```
+
+### 🔧 **utils.ps1 - Utility Functions**
+
+**Purpose**: Reusable utility functions and AWS operations
+
+**Key Components**:
+- AWS CLI integration
+- S3 bucket management
+- Path construction
+- File system operations
+
+**Architecture Pattern**: Utility/Helper Module
+
+```powershell
+# Core utilities
+function Test-AwsCli()                  # Verify AWS CLI availability
+function Confirm-S3Bucket($Name)        # Ensure S3 bucket exists
+function Get-SyncPaths($Date, $Config)  # Build sync paths
+function Invoke-S3Sync($Local, $S3)     # Execute S3 sync
+```
+
+### 📝 **logging.ps1 - Logging Infrastructure**
+
+**Purpose**: Centralized logging with rotation
+
+**Key Components**:
+- Monthly log rotation
+- Multi-level logging (INFO, WARNING, ERROR, SUCCESS)
+- Automatic log cleanup
+
+**Architecture Pattern**: Infrastructure Service
+
+```powershell
+# Logging API
+function Write-Log($Message, $Level)     # Write log entry
+function Initialize-Logging()           # Setup logging
+function Remove-OldLogs()               # Log rotation
+```
+
+### 🧹 **log-cleaner.ps1 - Log Management**
+
+**Purpose**: Advanced log cleanup and maintenance
+
+**Key Components**:
+- Configurable retention policies
+- Space management
+- Log archiving capabilities
+
+**Architecture Pattern**: Maintenance Service
+
+### 📁 **commands/ - CLI Commands**
+
+**Purpose**: Command-line interface implementations
+
+**Components**:
+- `sync.ps1` - Manual synchronization command
+- `status.ps1` - System status reporting
+- `install.ps1` - Prerequisites installation
+- `clear-logs.ps1` - Log cleanup utilities
+- `strategies.ps1` - Alternative sync strategies
+
+**Architecture Pattern**: Command Pattern with Facade
+
+---
+
+## 🔄 Component Interaction
+
+### 📊 **Execution Flow**
+
+```mermaid
+sequenceDiagram
+    participant Main as sync-main.ps1
+    participant Config as config.ps1
+    participant Service as sync-service.ps1
+    participant State as state-manager.ps1
+    participant Utils as utils.ps1
+    participant Log as logging.ps1
+    
+    Main->>Config: Import-YamlConfig()
+    Config->>Main: Return configurations
+    
+    Main->>Log: Initialize-Logging()
+    Main->>State: Start-StateExecution()
+    
+    Main->>Service: Start-AllSyncProcesses()
+    
+    loop For each configuration
+        Service->>Utils: Get-SyncPaths()
+        Service->>Utils: Test-AwsCli()
+        Service->>Utils: Confirm-S3Bucket()
+        Service->>Utils: Invoke-S3Sync()
+        Service->>State: Set-ConfigurationResult()
+        Service->>Log: Write-Log()
+    end
+    
+    Service->>Main: Return results
+    Main->>Log: Write-Log(Summary)
+```
+
+### 🔗 **Dependency Graph**
+
+```mermaid
+graph TD
+    A[sync-main.ps1] --> B[config.ps1]
+    A --> C[sync-service.ps1]
+    A --> D[logging.ps1]
+    A --> E[state-manager.ps1]
+    
+    C --> B
+    C --> E
+    C --> F[utils.ps1]
+    C --> D
+    
+    E --> D
+    F --> D
+    
+    G[Commands] --> B
+    G --> E
+    G --> D
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fff3e0
+    style E fill:#ffebee
+    style F fill:#f1f8e9
+    style G fill:#fce4ec
+```
+
+---
+
+## 💾 Data Flow
+
+### 📥 **Input Data Sources**
+
+1. **YAML Configuration** (`sync-config.yaml`)
+   - Global settings
+   - Sync configurations
+   - AWS parameters
+
+2. **Command Line Parameters**
+   - Target date
+   - Execution options
+
+3. **State File** (`state.json`)
+   - Previous execution history
+   - Configuration state
+
+### 📤 **Output Data Sinks**
+
+1. **Log Files** (`log/sync_YYYY-MM.log`)
+   - Execution logs
+   - Error details
+   - Performance metrics
+
+2. **State File** (`state.json`)
+   - Updated execution state
+   - Configuration results
+
+3. **AWS S3**
+   - Synchronized files
+   - Folder structures
+
+### 🔄 **Data Transformation Pipeline**
+
+```mermaid
+graph LR
+    A[YAML Config] --> B[PowerShell Objects]
+    B --> C[Sync Paths]
+    C --> D[AWS CLI Commands]
+    D --> E[S3 Storage]
+    
+    F[File System] --> G[Local Paths]
+    G --> C
+    
+    H[Execution Results] --> I[State JSON]
+    H --> J[Log Entries]
+    
+    style A fill:#e3f2fd
+    style E fill:#e8f5e8
+    style I fill:#fff3e0
+    style J fill:#fce4ec
+```
+
+---
+
+## 🔧 Development Guidelines
+
+### 📝 **Coding Standards**
+
+#### **PowerShell Best Practices**
+- Use **Approved Verbs** for function names (`Get-`, `Set-`, `Start-`, `Stop-`)
+- Implement **Parameter Validation** with `[ValidateSet]`, `[ValidateScript]`
+- Use **Splatting** for complex parameter passing
+- Implement **Error Handling** with `try/catch/finally`
+
+#### **Function Design**
+```powershell
+function Verb-Noun {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string] $RequiredParam,
+        
+        [Parameter(Mandatory = $false)]
+        [ValidateSet("Option1", "Option2")]
+        [string] $OptionalParam = "Option1"
+    )
+    
+    try {
+        # Implementation
+        return $result
     }
-  ]
+    catch {
+        Write-Log -Message "Error in Verb-Noun: $_" -Level "ERROR"
+        throw
+    }
 }
 ```
 
-### 🔄 **Rotación Automática de Logs**
+#### **Error Handling Pattern**
+```powershell
+try {
+    # Main logic
+    $result = Invoke-Operation
+    Write-Log -Message "Operation successful" -Level "SUCCESS"
+    return $result
+}
+catch {
+    $errorMsg = "Operation failed: $_"
+    Write-Log -Message $errorMsg -Level "ERROR"
+    
+    # For non-critical errors, continue processing
+    if ($ContinueOnError) {
+        return $null
+    }
+    
+    # For critical errors, halt execution
+    throw $errorMsg
+}
+```
 
-- **Frecuencia:** Al inicio de cada ejecución
-- **Retención:** Configurable (por defecto 12 meses)
-- **Proceso:** Eliminación automática de logs antiguos
-- **Notificación:** Se registra en el log cuando se eliminan archivos
+### 🧪 **Testing Approach**
+
+#### **Unit Testing Structure**
+```powershell
+# Test file: Tests/config.tests.ps1
+Describe "Configuration Management" {
+    Context "YAML Loading" {
+        It "Should load valid YAML configuration" {
+            $config = Import-YamlConfig -ScriptRoot $testRoot
+            $config | Should -Not -BeNullOrEmpty
+        }
+        
+        It "Should validate required fields" {
+            { Import-YamlConfig -ScriptRoot $invalidRoot } | Should -Throw
+        }
+    }
+}
+```
+
+#### **Integration Testing**
+```powershell
+# Test file: Tests/integration.tests.ps1
+Describe "End-to-End Synchronization" {
+    BeforeAll {
+        # Setup test environment
+        $testConfig = New-TestConfiguration
+        $testFiles = New-TestFiles
+    }
+    
+    It "Should synchronize test files to S3" {
+        $result = Start-SyncProcess -TargetDate $testDate -SyncConfig $testConfig
+        $result | Should -BeTrue
+    }
+    
+    AfterAll {
+        # Cleanup test resources
+        Remove-TestFiles
+    }
+}
+```
 
 ---
 
-## 🔧 Mantenimiento
+## 🛠️ Extension Points
 
-### 📁 **Módulos del Sistema**
+### 🔌 **Adding New Commands**
 
-#### **1. `config.ps1` - Configuración Global**
-```powershell
-# Funciones principales:
-- Import-YamlConfig          # Carga configuración YAML
-- Get-GlobalConfig           # Obtiene configuración global
-- Get-SyncConfigurations     # Obtiene configuraciones de sync
-```
-
-#### **2. `utils.ps1` - Utilidades**
-```powershell
-# Funciones de utilidad:
-- Test-AndCreateFolder       # Crear carpetas si no existen
-- Test-AwsCli               # Verificar AWS CLI
-- Get-SyncPaths             # Construir rutas de sincronización
-- Invoke-S3Sync             # Ejecutar comando de sincronización
-```
-
-#### **3. `logging.ps1` - Sistema de Logs**
-```powershell
-# Funciones de logging:
-- Write-Log                 # Escribir mensajes en logs
-- Remove-OldLogs            # Rotación automática de logs
-- Initialize-Logging        # Inicializar sistema de logging
-```
-
-#### **4. `state-manager.ps1` - Manejo de Estado**
-```powershell
-# Funciones de estado:
-- Get-State                 # Leer archivo de estado JSON
-- Set-State                 # Guardar estado en JSON
-- New-StateEntry            # Crear nueva entrada de estado
-- Add-StateEntry            # Agregar entrada al estado
-```
-
-#### **5. `sync-service.ps1` - Lógica Principal**
-```powershell
-# Funciones principales:
-- Start-AllSyncProcesses    # Procesar todas las configuraciones
-- Start-SyncProcess         # Procesar una configuración
-- Test-SystemPrerequisites  # Validar prerrequisitos
-```
-
-### 🔄 **Tareas de Mantenimiento Recomendadas**
-
-#### **Semanalmente:**
-- ✅ Revisar logs de errores en `log/sync_YYYY-MM.log`
-- ✅ Verificar estado de configuraciones en `state.json`
-- ✅ Comprobar espacio disponible en buckets S3
-
-#### **Mensualmente:**
-- 🔄 Revisar y actualizar configuraciones en `sync-config.yaml`
-- 📊 Analizar tendencias de sincronización en logs
-- 🔐 Verificar permisos y credenciales AWS
-
-#### **Trimestralmente:**
-- 📦 Actualizar AWS CLI a la última versión
-- 🔧 Revisar y optimizar opciones de sincronización
-- 📈 Evaluar rendimiento y tiempos de ejecución
-
----
-
-## 🛠️ Solución de Problemas
-
-### ❌ **Errores Comunes y Soluciones**
-
-#### **1. Error: "No se puede cargar el archivo"**
-```
-❌ Problema: Set-ExecutionPolicy restrictions
-✅ Solución:
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-#### **2. Error: "AWS CLI no encontrado"**
-```
-❌ Problema: AWS CLI no instalado o no en PATH
-✅ Solución:
-- Instalar desde: https://aws.amazon.com/cli/
-- Verificar con: aws --version
-- Reiniciar PowerShell después de la instalación
-```
-
-#### **3. Error: "Carpeta no encontrada"**
-```
-❌ Problema: La carpeta de fecha no existe en la ruta especificada
-✅ Solución:
-- Verificar formato de fecha en date_folder_format
-- Confirmar que existe la carpeta para la fecha objetivo
-- Revisar ruta en local_base_path
-```
-
-#### **4. Error: "Access Denied S3"**
-```
-❌ Problema: Permisos insuficientes en AWS
-✅ Solución:
-- Verificar credenciales AWS: aws sts get-caller-identity
-- Confirmar permisos S3 en el bucket
-- Revisar políticas IAM asociadas
-```
-
-#### **5. Error: "Module PowerShell-Yaml not found"**
-```
-❌ Problema: Módulo YAML no instalado
-✅ Solución:
-Install-Module -Name powershell-yaml -Force -Scope CurrentUser
-```
-
-### 🔍 **Diagnóstico y Debug**
-
-#### **Verificar Estado del Sistema:**
-```powershell
-# Verificar AWS CLI
-aws --version
-aws sts get-caller-identity
-
-# Verificar módulo YAML
-Get-Module -ListAvailable powershell-yaml
-
-# Verificar configuración
-Test-Path ".\sync-config.yaml"
-```
-
-#### **Modo Debug:**
-Para obtener más información durante la ejecución, puedes modificar temporalmente el nivel de log en `logging.ps1`:
+Create new commands in `src/commands/`:
 
 ```powershell
-# Cambiar en logging.ps1 para debug más detallado
-$VerbosePreference = "Continue"
-$DebugPreference = "Continue"
-```
+# src/commands/new-command.ps1
+<#
+.SYNOPSIS
+    New command for the AWS S3 Sync system
+#>
 
-### 📊 **Monitoreo de Rendimiento**
-
-#### **Métricas Importantes:**
-- ⏱️ **Tiempo de Ejecución**: Registrado en state.json
-- 📁 **Archivos Transferidos**: Conteo en logs
-- 💾 **Tamaño de Datos**: Visible en salida de aws s3 sync
-- 🚨 **Tasa de Errores**: Proporción de configuraciones fallidas
-
----
-
-## 📈 Programación Automática
-
-### ⏰ **Configuración del Programador de Tareas de Windows**
-
-Para ejecutar automáticamente el sistema cada día:
-
-#### **Método 1: Interfaz Gráfica**
-
-1. **Abrir Programador de Tareas:**
-   - Buscar "Programador de tareas" en el menú Inicio
-   - O ejecutar: `taskschd.msc`
-
-2. **Crear Tarea Básica:**
-   - Clic en "Crear tarea básica..."
-   - Nombre: `AWS S3 Sync Diario`
-   - Descripción: `Sincronización automática de carpetas diarias con S3`
-
-3. **Configurar Desencadenador:**
-   - Frecuencia: `Diariamente`
-   - Hora: `00:00:00` (medianoche)
-   - Repetir cada: `1 día`
-
-4. **Configurar Acción:**
-   - Acción: `Iniciar un programa`
-   - Programa/script: `powershell.exe`
-   - Argumentos: `-File "C:\ruta\completa\sync-main.ps1"`
-   - Directorio de inicio: `C:\ruta\completa\`
-
-#### **Método 2: PowerShell**
-
-```powershell
-# Crear tarea programada via PowerShell
-$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-File "C:\ruta\completa\sync-main.ps1"' -WorkingDirectory 'C:\ruta\completa\'
-$trigger = New-ScheduledTaskTrigger -Daily -At "00:00"
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -RunLevel Highest
-
-Register-ScheduledTask -TaskName "AWS S3 Sync Diario" -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description "Sincronización automática de carpetas diarias con S3"
-```
-
-### ⚙️ **Configuraciones Avanzadas**
-
-#### **Ejecución con Diferentes Horarios:**
-```powershell
-# Para múltiples ejecuciones diarias
-$triggers = @(
-    New-ScheduledTaskTrigger -Daily -At "00:00"  # Medianoche
-    New-ScheduledTaskTrigger -Daily -At "12:00"  # Mediodía
+param(
+    [Parameter(Mandatory = $false)]
+    [string] $Parameter1
 )
+
+# Get project root (two levels up from src/commands)
+$ProjectRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+
+# Import required modules
+. (Join-Path $ProjectRoot "src\config.ps1")
+. (Join-Path $ProjectRoot "src\logging.ps1")
+
+function Invoke-NewCommand {
+    # Implementation
+}
+
+# Execute if called directly
+if ($MyInvocation.InvocationName -eq $MyInvocation.MyCommand.Name) {
+    Invoke-NewCommand
+}
 ```
 
-#### **Notificaciones por Email:**
-Para recibir notificaciones de errores, puedes agregar al final de `sync-main.ps1`:
+### 🔧 **Adding New Sync Strategies**
+
+Extend `src/commands/strategies.ps1`:
 
 ```powershell
-# Enviar email en caso de error
-if ($syncResults.ErrorCount -gt 0) {
-    Send-MailMessage -To "admin@empresa.com" -From "sistema@empresa.com" -Subject "Error en AWS S3 Sync" -Body "Se produjeron $($syncResults.ErrorCount) errores en la sincronización." -SmtpServer "smtp.empresa.com"
+function Invoke-CustomSyncStrategy {
+    param(
+        [string] $LocalPath,
+        [string] $S3Path,
+        [array] $Options
+    )
+    
+    # Custom synchronization logic
+    return @{
+        Success = $true
+        FilesTransferred = $count
+        Message = "Custom sync completed"
+    }
+}
+```
+
+### 📊 **Adding New State Reporters**
+
+Extend `src/state-manager.ps1`:
+
+```powershell
+function Get-CustomStateReport {
+    $state = Get-State
+    
+    # Custom report generation
+    return @{
+        CustomMetric1 = $value1
+        CustomMetric2 = $value2
+    }
+}
+```
+
+### 🔍 **Adding New Validators**
+
+Extend `src/utils.ps1`:
+
+```powershell
+function Test-CustomValidation {
+    param(
+        [PSCustomObject] $Config
+    )
+    
+    # Custom validation logic
+    if (-not $validationPassed) {
+        throw "Custom validation failed: $reason"
+    }
 }
 ```
 
 ---
 
-## 🎯 **Resumen de Ventajas**
+## 🧪 Testing Strategy
 
-### 🚀 **Beneficios del Sistema Modular**
+### 🎯 **Testing Pyramid**
 
-1. **📦 Separación de Responsabilidades**
-   - Cada módulo tiene una función específica
-   - Fácil mantenimiento y debugging
-   - Posibilidad de testear componentes independientemente
+```mermaid
+graph TD
+    A[Unit Tests] --> B[Integration Tests] --> C[System Tests]
+    
+    A1[Function Tests] --> A
+    A2[Module Tests] --> A
+    
+    B1[Service Integration] --> B
+    B2[AWS Integration] --> B
+    
+    C1[End-to-End] --> C
+    C2[Performance] --> C
+    
+    style A fill:#e8f5e8
+    style B fill:#fff3e0
+    style C fill:#ffebee
+```
 
-2. **🔄 Escalabilidad**
-   - Agregar nuevas configuraciones sin modificar código
-   - Soporte para múltiples buckets y estructuras
-   - Extensible con nuevas funcionalidades
+### 🔬 **Test Categories**
 
-3. **🛡️ Robustez y Confiabilidad**
-   - Manejo exhaustivo de errores
-   - Continuidad ante fallos parciales
-   - Logs detallados para auditoría
+#### **1. Unit Tests**
+- Individual function validation
+- Error handling verification
+- Input/output validation
+- Mock external dependencies
 
-4. **⚙️ Flexibilidad de Configuración**
-   - Configuración via YAML legible
-   - Opciones personalizables por configuración
-   - Estructura S3 completamente personalizable
+#### **2. Integration Tests**
+- Module interaction testing
+- AWS CLI integration
+- File system operations
+- State persistence validation
 
-5. **📊 Monitoreo y Auditoría**
-   - Estado persistente de todas las operaciones
-   - Logs mensuales con rotación automática
-   - Métricas de rendimiento y errores
+#### **3. System Tests**
+- Complete workflow testing
+- Performance benchmarking
+- Error recovery testing
+- Multi-configuration scenarios
+
+### 🏃 **Running Tests**
+
+```powershell
+# Install Pester if not available
+if (-not (Get-Module -ListAvailable Pester)) {
+    Install-Module -Name Pester -Force -Scope CurrentUser
+}
+
+# Run all tests
+Invoke-Pester -Path "Tests/" -OutputFormat "NUnitXml" -OutputFile "TestResults.xml"
+
+# Run specific test category
+Invoke-Pester -Path "Tests/unit/" -Tag "Unit"
+Invoke-Pester -Path "Tests/integration/" -Tag "Integration"
+```
 
 ---
 
-## 📞 **Soporte y Contribuciones**
+## 🚀 **Development Workflow**
 
-Para mantener este sistema funcionando correctamente:
+### 🔄 **Recommended Development Process**
 
-- 📚 **Documentación**: Mantén este README actualizado
-- 🐛 **Reporte de Bugs**: Documenta errores en los logs
-- 🔄 **Actualizaciones**: Revisa periódicamente las dependencias
-- 📈 **Mejoras**: Considera optimizaciones basadas en métricas de uso
+1. **📋 Planning**
+   - Define requirements and scope
+   - Design component interfaces
+   - Plan testing strategy
+
+2. **🔧 Implementation**
+   - Follow coding standards
+   - Implement core functionality
+   - Add comprehensive error handling
+
+3. **🧪 Testing**
+   - Write unit tests first (TDD)
+   - Implement integration tests
+   - Perform system testing
+
+4. **📝 Documentation**
+   - Update inline documentation
+   - Update this architecture guide
+   - Update user documentation
+
+5. **🚀 Deployment**
+   - Validate in test environment
+   - Deploy to production
+   - Monitor execution logs
+
+### 🛠️ **Development Environment Setup**
+
+```powershell
+# Clone repository
+git clone <repository-url>
+cd aws-s3-sync
+
+# Install development dependencies
+.\src\commands\install.ps1
+
+# Install testing framework
+Install-Module -Name Pester -Force -Scope CurrentUser
+
+# Run initial validation
+.\src\commands\status.ps1
+```
 
 ---
 
-**🎉 ¡El sistema AWS S3 Sync está listo para automatizar tus backups de forma eficiente y confiable!**
+## 📚 **Additional Resources**
+
+### 🔗 **Related Documentation**
+- [User Guide](../README.md) - End-user documentation
+- [Configuration Guide](../sync-config.yaml) - YAML configuration examples
+- [PowerShell Best Practices](https://docs.microsoft.com/en-us/powershell/scripting/learn/ps101/00-introduction)
+- [AWS CLI Documentation](https://docs.aws.amazon.com/cli/)
+
+### 🤝 **Contributing**
+- Follow the coding standards outlined in this document
+- Write comprehensive tests for new features
+- Update documentation for any architectural changes
+- Use descriptive commit messages
+
+### 📞 **Support**
+For technical questions about the architecture:
+- Review this documentation first
+- Check existing unit and integration tests
+- Examine the state and log files for runtime information
+- Follow the troubleshooting patterns in the main user guide
+
+---
+
+**🎯 This architectural guide serves as the foundation for understanding, maintaining, and extending the AWS S3 Sync system. For user-focused documentation, see the main [README.md](../README.md).**
