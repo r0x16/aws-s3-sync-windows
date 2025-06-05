@@ -38,6 +38,29 @@ function Start-SyncProcess {
         return $false
     }
     
+    # Verificar/crear bucket S3 si es necesario
+    $awsProfile = if ($SyncConfig.aws_profile) { $SyncConfig.aws_profile } else { "default" }
+    $bucketRegion = if ($SyncConfig.aws_region) { $SyncConfig.aws_region } else { $null }
+    
+    Write-Log -Message "[$($SyncConfig.name)] Verificando bucket S3: $($SyncConfig.bucket_name)"
+    $bucketResult = Confirm-S3Bucket -BucketName $SyncConfig.bucket_name -AwsProfile $awsProfile -Region $bucketRegion
+    
+    if (-not $bucketResult.Success) {
+        $msg = "[$($SyncConfig.name)] Error al verificar/crear bucket S3 '$($SyncConfig.bucket_name)': $($bucketResult.Message)"
+        Write-Log -Message $msg -Level "ERROR"
+        
+        # Registrar resultado con información detallada
+        Set-ConfigurationResult -ConfigName $SyncConfig.name -Status "Failure" -Message $msg -Date $syncPaths.DayFolder -LocalPath $syncPaths.LocalPath -S3Path $syncPaths.S3Path
+        return $false
+    }
+    
+    # Registrar el resultado del bucket
+    if ($bucketResult.Action -eq "Created") {
+        Write-Log -Message "[$($SyncConfig.name)] Bucket S3 '$($SyncConfig.bucket_name)' creado exitosamente en la región '$($bucketResult.Region)'"
+    } elseif ($bucketResult.Action -eq "Exists") {
+        Write-Log -Message "[$($SyncConfig.name)] Bucket S3 '$($SyncConfig.bucket_name)' ya existía"
+    }
+    
     # Contar archivos antes de la sincronización
     $filesBeforeSync = 0
     try {
@@ -50,7 +73,6 @@ function Start-SyncProcess {
     
     # Ejecutar sincronización con opciones específicas
     $syncOptions = if ($SyncConfig.sync_options) { $SyncConfig.sync_options } else { @() }
-    $awsProfile = if ($SyncConfig.aws_profile) { $SyncConfig.aws_profile } else { "default" }
     $syncResult = Invoke-S3Sync -LocalPath $syncPaths.LocalPath -S3Path $syncPaths.S3Path -SyncOptions $syncOptions -AwsProfile $awsProfile
     
     # Calcular duración

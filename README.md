@@ -50,8 +50,9 @@ sync_configurations:
 
 ### Parámetros principales:
 - **`local_base_path`**: Carpeta donde están tus carpetas diarias (ej: `C:\Documentos`)
-- **`bucket_name`**: Nombre del bucket S3 (sin `s3://`)
+- **`bucket_name`**: Nombre del bucket S3 (sin `s3://`) - **Se crea automáticamente si no existe**
 - **`aws_profile`**: Profile de AWS a usar (`"default"` o nombre específico)
+- **`aws_region`**: Región AWS donde crear el bucket (opcional, se detecta automáticamente)
 - **`s3_path_structure`**: Cómo organizar en S3. Usa `{year}`, `{month}`, `{day}`
 - **`date_folder_format`**: Formato de tus carpetas de fecha local
 - **`sync_options`**: Opciones adicionales de AWS CLI (excluir archivos, etc.)
@@ -65,6 +66,32 @@ sync_configurations:
 # Sincronizar fecha específica
 .\sync-main.ps1 -TargetDate (Get-Date "2024-12-15")
 ```
+
+## ☁️ Creación Automática de Buckets S3
+
+**¡Nueva funcionalidad!** El sistema ahora verifica automáticamente si los buckets S3 existen y los crea si es necesario.
+
+### Características:
+- **Verificación automática**: Antes de cada sincronización, se verifica si el bucket existe
+- **Creación inteligente**: Si no existe, se crea usando el profile y región configurados
+- **Configuraciones de seguridad**: Los buckets se crean con:
+  - ✅ Versionado habilitado
+  - ✅ Cifrado AES256 por defecto
+  - ✅ Configuración de región apropiada
+
+### Configuración de región:
+```yaml
+sync_configurations:
+  - name: "Mi Backup"
+    bucket_name: "mi-nuevo-bucket"
+    aws_profile: "mi-profile"
+    aws_region: "us-west-2"  # Opcional: especifica la región
+    # ... otros parámetros
+```
+
+Si no se especifica `aws_region`, el sistema:
+1. Intentará detectar la región del profile AWS configurado
+2. Usará `us-east-1` como región por defecto
 
 ## ⏰ Programación Automática
 

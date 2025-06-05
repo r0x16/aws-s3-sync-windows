@@ -112,6 +112,214 @@ function Invoke-S3Sync {
     }
 }
 
+# Función: Verificar si un bucket S3 existe
+function Test-S3Bucket {
+    param (
+        [string] $BucketName,
+        [string] $AwsProfile = "default"
+    )
+    
+    try {
+        # Construir comando para verificar bucket usando aws s3 ls
+        $command = "aws s3 ls s3://$BucketName/"
+        
+        # Agregar profile si no es "default"
+        if ($AwsProfile -and $AwsProfile -ne "default") {
+            $command += " --profile `"$AwsProfile`""
+        }
+        
+        Write-Log -Message "Verificando existencia del bucket: $BucketName"
+        Write-Log -Message "Ejecutando comando AWS: $command"
+        
+        # Capturar tanto stdout como stderr por separado
+        $outputResult = & cmd /c "$command 2>&1"
+        $exitCode = $LASTEXITCODE
+        
+        Write-Log -Message "Código de salida: $exitCode"
+        Write-Log -Message "Output del comando: $($outputResult -join ' | ')"
+        
+        # Verificar si hay errores específicos de AWS
+        $outputString = $outputResult -join " "
+        $bucketExists = $true
+        
+        if ($exitCode -ne 0) {
+            $bucketExists = $false
+            Write-Log -Message "Comando falló con código de salida: $exitCode"
+        }
+        
+        # Verificar errores específicos en el output
+        if ($outputString -match "NoSuchBucket" -or 
+            $outputString -match "does not exist" -or
+            $outputString -match "AccessDenied.*bucket.*not.*exist" -or
+            $outputString -match "The specified bucket does not exist") {
+            $bucketExists = $false
+            Write-Log -Message "Bucket no existe - detectado por contenido del error: $outputString"
+        }
+        
+        # Si no hay errores y el código de salida es 0, el bucket existe
+        if ($exitCode -eq 0 -and -not ($outputString -match "error|Error|ERROR")) {
+            $bucketExists = $true
+            Write-Log -Message "Bucket existe - comando exitoso sin errores"
+        }
+        
+        return @{
+            Exists = $bucketExists
+            Output = $outputResult
+            Command = $command
+            ExitCode = $exitCode
+        }
+    }
+    catch {
+        Write-Log -Message "Excepción al verificar bucket: $_" -Level "ERROR"
+        return @{
+            Exists = $false
+            Output = $_.Exception.Message
+            Command = $command
+            ExitCode = -1
+        }
+    }
+}
+
+# Función: Crear bucket S3 si no existe
+function New-S3Bucket {
+    param (
+        [string] $BucketName,
+        [string] $AwsProfile = "default",
+        [string] $Region = $null
+    )
+    
+    try {
+        # Determinar región
+        if (-not $Region) {
+            # Intentar obtener región por defecto del profile
+            try {
+                $regionCommand = "aws configure get region"
+                if ($AwsProfile -and $AwsProfile -ne "default") {
+                    $regionCommand += " --profile `"$AwsProfile`""
+                }
+                Write-Log -Message "Ejecutando comando AWS para obtener región: $regionCommand"
+                $Region = Invoke-Expression -Command $regionCommand 2>$null
+                Write-Log -Message "Región detectada: $Region"
+                if (-not $Region) {
+                    $Region = "us-east-1"  # Región por defecto
+                    Write-Log -Message "No se detectó región, usando por defecto: $Region"
+                }
+            }
+            catch {
+                $Region = "us-east-1"
+                Write-Log -Message "Error al detectar región, usando por defecto: $Region"
+            }
+        }
+        
+        # Construir comando para crear bucket usando aws s3 mb
+        $command = "aws s3 mb s3://$BucketName"
+        
+        # Agregar profile si no es "default"
+        if ($AwsProfile -and $AwsProfile -ne "default") {
+            $command += " --profile `"$AwsProfile`""
+        }
+        
+        # Agregar región
+        if ($Region) {
+            $command += " --region `"$Region`""
+        }
+        
+        Write-Log -Message "Creando bucket S3: $BucketName en región: $Region"
+        Write-Log -Message "Ejecutando comando AWS: $command"
+        $output = Invoke-Expression -Command $command 2>&1
+        $success = $?
+        Write-Log -Message "Resultado del comando (éxito: $success): $($output -join ' ')"
+        
+        if ($success) {
+            Write-Log -Message "Bucket '$BucketName' creado exitosamente en la región '$Region'"
+            
+            # Opcional: Configurar versionado y cifrado por defecto usando aws s3api para estas configuraciones específicas
+            try {
+                # Habilitar versionado
+                $versionCommand = "aws s3api put-bucket-versioning --bucket `"$BucketName`" --versioning-configuration Status=Enabled"
+                if ($AwsProfile -and $AwsProfile -ne "default") {
+                    $versionCommand += " --profile `"$AwsProfile`""
+                }
+                Write-Log -Message "Ejecutando comando AWS para versionado: $versionCommand"
+                $versionOutput = Invoke-Expression -Command $versionCommand 2>&1
+                $versionSuccess = $?
+                Write-Log -Message "Resultado del versionado (éxito: $versionSuccess): $($versionOutput -join ' ')"
+                
+                # Habilitar cifrado por defecto
+                $encryptionCommand = "aws s3api put-bucket-encryption --bucket `"$BucketName`" --server-side-encryption-configuration '{`"Rules`":[{`"ApplyServerSideEncryptionByDefault`":{`"SSEAlgorithm`":`"AES256`"}}]}'"
+                if ($AwsProfile -and $AwsProfile -ne "default") {
+                    $encryptionCommand += " --profile `"$AwsProfile`""
+                }
+                Write-Log -Message "Ejecutando comando AWS para cifrado: $encryptionCommand"
+                $encryptionOutput = Invoke-Expression -Command $encryptionCommand 2>&1
+                $encryptionSuccess = $?
+                Write-Log -Message "Resultado del cifrado (éxito: $encryptionSuccess): $($encryptionOutput -join ' ')"
+                
+                Write-Log -Message "Configuraciones adicionales aplicadas al bucket '$BucketName' (versionado: $versionSuccess, cifrado: $encryptionSuccess)"
+            }
+            catch {
+                Write-Log -Message "Advertencia: No se pudieron aplicar todas las configuraciones adicionales al bucket '$BucketName': $_" -Level "WARNING"
+            }
+        }
+        
+        return @{
+            Success = $success
+            Output = $output
+            Command = $command
+            Region = $Region
+        }
+    }
+    catch {
+        return @{
+            Success = $false
+            Output = $_.Exception.Message
+            Command = $command
+            Region = $Region
+        }
+    }
+}
+
+# Función: Asegurar que el bucket S3 existe (verificar y crear si es necesario)
+function Confirm-S3Bucket {
+    param (
+        [string] $BucketName,
+        [string] $AwsProfile = "default",
+        [string] $Region = $null
+    )
+    
+    # Verificar si el bucket ya existe
+    $bucketCheck = Test-S3Bucket -BucketName $BucketName -AwsProfile $AwsProfile
+    
+    if ($bucketCheck.Exists) {
+        Write-Log -Message "Bucket S3 '$BucketName' ya existe"
+        return @{
+            Success = $true
+            Action = "Exists"
+            Message = "Bucket ya existía"
+        }
+    }
+    
+    # El bucket no existe, intentar crearlo
+    Write-Log -Message "Bucket S3 '$BucketName' no existe, creándolo..."
+    $bucketCreation = New-S3Bucket -BucketName $BucketName -AwsProfile $AwsProfile -Region $Region
+    
+    if ($bucketCreation.Success) {
+        return @{
+            Success = $true
+            Action = "Created"
+            Message = "Bucket creado exitosamente en la región '$($bucketCreation.Region)'"
+            Region = $bucketCreation.Region
+        }
+    } else {
+        return @{
+            Success = $false
+            Action = "Failed"
+            Message = "Error al crear bucket: $($bucketCreation.Output)"
+            Output = $bucketCreation.Output
+        }
+    }
+}
+
 # Función: Eliminar carpeta de forma forzada cuando hay handles abiertos
 function Remove-FolderForced {
     param (

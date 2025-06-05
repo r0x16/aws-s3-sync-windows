@@ -22,6 +22,7 @@ sync_configurations:
   local_base_path: "C:\\Datos\\Documentos"
   bucket_name: "corp-documentos-backup"
   aws_profile: "default" # Profile de AWS a usar. Si es "default", se omite --profile en el comando
+  aws_region: "us-east-1" # Región AWS donde crear el bucket (opcional, se detecta automáticamente)
   s3_path_structure: "{year}/{month}/{day}" # Opcional: personalizar estructura S3
   date_folder_format: "yyyy-MM-dd" # Formato de carpetas de fecha
   sync_options:
@@ -34,6 +35,7 @@ sync_configurations:
   local_base_path: "D:\\Fotos\\Diarias"
   bucket_name: "fotos-backup-s3"
   aws_profile: "personal" # Usa profile específico: aws s3 sync --profile personal
+  aws_region: "eu-west-1" # Ejemplo: usar región europea
   s3_path_structure: "fotos/{year}/{month}/{day}"
   date_folder_format: "yyyy-MM-dd"
   sync_options:
