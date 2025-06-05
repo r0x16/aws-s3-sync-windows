@@ -1,0 +1,50 @@
+# Configuration files
+sync-config.yaml
+config.yaml
+*.config
+
+# Log files
+*.log
+logs/
+*.log.*
+
+# State files
+*.state
+*.tmp
+state/
+sync-state.json
+
+# AWS credentials
+.aws/
+aws-credentials.txt
+credentials
+
+# PowerShell specific
+*.psm1.bak
+*.ps1.bak
+
+# Temporary files
+temp/
+tmp/
+*.temp
+
+# Backup files
+*.backup
+*.bak
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Cache files
+*.cache
+cache/ 
